@@ -22,7 +22,7 @@ Este documento descreve a estrutura de pastas e o fluxo de autenticação implem
 .
 ├── app/
 │   ├── layout.tsx                # Layout raiz (fonte, html/body)
-│   ├── page.tsx                  # Rota "/" (redireciona conforme sessão)
+│   ├── page.tsx                  # Rota "/" (redireciona incondicionalmente para /dashboard; o middleware trata o redirect para /login quando não há sessão)
 │   ├── login/
 │   │   ├── page.tsx              # Tela de login (formulário username/senha)
 │   │   └── actions.ts            # Server Actions: signIn(), signOut()

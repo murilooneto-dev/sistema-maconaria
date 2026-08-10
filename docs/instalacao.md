@@ -88,12 +88,6 @@ No painel Supabase, vá em **Authentication → Users → Add user → Create ne
 - **Password**: defina uma senha forte temporária.
 - Marque **Auto Confirm User** (para não depender de confirmação por e-mail, já que o e-mail é fictício).
 
-Alternativa via SQL Editor (caso prefira não usar a UI), usando a função administrativa do Supabase:
-
-```sql
-select auth.uid() from auth.users; -- apenas para conferir que a extensão auth está disponível
-```
-
 > Criar usuários diretamente via `insert into auth.users` não é recomendado nem suportado pelo Supabase (a tabela tem triggers e requisitos internos de hashing de senha). Use sempre a tela **Authentication → Users** do Dashboard ou a Admin API (`supabase.auth.admin.createUser`) para criar o registro em `auth.users`.
 
 Depois de criar o usuário, copie o **UUID** gerado (coluna `id` na listagem de usuários).
