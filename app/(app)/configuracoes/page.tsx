@@ -1,8 +1,59 @@
-export default function EmDesenvolvimentoPage() {
+import Link from 'next/link'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
+
+const SECOES = [
+  { titulo: 'Usuários', href: '/configuracoes/usuarios', apenasAdmin: true },
+  { titulo: 'Loja', href: null },
+  { titulo: 'Mensalidades', href: null },
+  { titulo: 'Remidos', href: null },
+  { titulo: 'Contas', href: null },
+  { titulo: 'Formas de pagamento', href: null },
+  { titulo: 'Recibo', href: null },
+] as const
+
+export default async function ConfiguracoesPage() {
+  const supabase = await createSupabaseServerClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  let isAdmin = false
+  if (user) {
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+    isAdmin = profile?.role === 'ADMINISTRADOR'
+  }
+
   return (
-    <div className="rounded border border-dashed border-slate-300 p-8 text-center text-slate-500">
-      <p className="font-medium">Módulo em desenvolvimento</p>
-      <p className="text-sm">Esta funcionalidade será implementada em uma fase futura do projeto.</p>
+    <div className="space-y-6">
+      <h1 className="text-lg font-semibold text-slate-900">Configurações</h1>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {SECOES.map((secao) => {
+          const habilitado = secao.href !== null && (!secao.apenasAdmin || isAdmin)
+
+          if (habilitado && secao.href) {
+            return (
+              <Link
+                key={secao.titulo}
+                href={secao.href}
+                className="rounded-lg border border-slate-200 bg-white p-4 text-sm font-medium text-slate-900 hover:border-slate-400"
+              >
+                {secao.titulo}
+              </Link>
+            )
+          }
+
+          return (
+            <div
+              key={secao.titulo}
+              className="rounded-lg border border-dashed border-slate-200 p-4 text-sm text-slate-400"
+            >
+              {secao.titulo}
+              <span className="ml-2 text-xs">(em breve)</span>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
