@@ -51,8 +51,9 @@ Este documento descreve a estrutura de pastas e o fluxo de autenticação implem
 │       └── middleware.ts         # updateSession() — validação/refresh de sessão a cada request
 ├── proxy.ts                      # Proxy do Next.js (antigo middleware.ts), delega para lib/supabase/middleware.ts
 ├── supabase/
-│   └── migrations/
-│       └── 00000000000001_profiles.sql  # Tabela profiles + RLS + trigger updated_at
+│   ├── migrations/
+│   │   └── 00000000000001_profiles.sql  # Tabela profiles + RLS + trigger updated_at
+│   └── seed.sql                  # dados de desenvolvimento (formas de pagamento padrão, config inicial da loja)
 ├── docs/
 │   ├── arquitetura.md            # Este arquivo
 │   ├── banco.md                  # Schema, RLS, constraints, decisões de design

@@ -57,6 +57,709 @@ Este documento descreve o schema do banco de dados, políticas de Row Level Secu
 
 ---
 
+## Funções auxiliares de RLS (`00000000000002_auth_helpers.sql`)
+
+Antes das tabelas de domínio, a Fase 2 cria três funções `security definer` usadas por praticamente todas as policies de escrita das tabelas abaixo:
+
+- **`public.current_profile_role()`** — retorna o `role` do `profiles` cujo `id = auth.uid()`, mas **somente se `ativo = true`**. Um usuário desativado passa a ser tratado como "sem role" por qualquer policy que dependa desta função, mesmo com sessão válida — reforça a regra de que `ativo = false` bloqueia operações de escrita no banco, não só na UI.
+- **`public.is_admin()`** — `true` quando `current_profile_role() = 'ADMINISTRADOR'`.
+- **`public.is_tesoureiro()`** — `true` quando `current_profile_role()` é `'ADMINISTRADOR'` ou `'TESOUREIRO'` (Administrador herda as permissões de Tesoureiro).
+
+As três são `stable`, `security definer` e `set search_path = ''`, seguindo o mesmo padrão de `public.set_updated_at()` (Fase 1): evita que RLS na própria tabela `profiles` impeça a função de ler o role do usuário logado, e o `search_path` vazio evita sequestro de função por schema.
+
+**Por quê:** CLAUDE.md §10/§11 exige que a autorização por perfil seja validada no servidor/banco, nunca só na interface. Centralizar a lógica de role em três funções SQL reutilizadas por todas as policies evita duplicar (e divergir) a regra de permissão em cada tabela.
+
+---
+
+## Tabela: `loja_config`
+
+**Namespace:** `public.loja_config` · **Migration:** `00000000000003_loja_config_mensalidade.sql`
+
+**Responsabilidade:** Configuração única da Loja (nome, logo), usada no layout/branding do sistema.
+
+### Campos
+
+| Campo | Tipo | NOT NULL | Padrão | Descrição |
+|-------|------|----------|--------|-----------|
+| `id` | `smallint` | Sim | `1` | PK fixa; `check (id = 1)` garante linha única (padrão "singleton row"). |
+| `nome` | `text` | Sim | — | Nome da Loja. |
+| `logo_url` | `text` | Não | — | URL do logo (Supabase Storage). |
+| `created_at` / `updated_at` | `timestamptz` | Sim | `now()` | Auditoria temporal padrão. |
+
+### Constraints
+
+- **Check:** `id = 1` — impede a criação de uma segunda linha de configuração.
+
+### RLS
+
+- `loja_config_select_authenticated` (SELECT, `authenticated`, `true`): qualquer usuário logado lê a config (nome/logo aparecem no header/layout para todos os perfis).
+- `loja_config_write_admin` (ALL, `authenticated`, `using/with check public.is_admin()`): só Administrador escreve.
+
+**Por quê:** SPEC §28 (Configurações) reserva a edição de dados institucionais da Loja ao Administrador; leitura precisa ser ampla porque o nome/logo aparece na UI para todos.
+
+### Triggers
+
+`loja_config_set_updated_at` (BEFORE UPDATE) → `public.set_updated_at()`.
+
+---
+
+## Tabela: `config_mensalidade`
+
+**Namespace:** `public.config_mensalidade` · **Migration:** `00000000000003_loja_config_mensalidade.sql`
+
+**Responsabilidade:** Histórico de valores de mensalidade vigentes por `tipo` (`NORMAL`/`REMIDO`), com o rateio Loja/Grande Loja já definido no momento do cadastro.
+
+### Campos
+
+| Campo | Tipo | NOT NULL | Padrão | Descrição |
+|-------|------|----------|--------|-----------|
+| `id` | `uuid` | Sim | `gen_random_uuid()` | PK. |
+| `tipo` | `text` | Sim | — | `'NORMAL'` ou `'REMIDO'` (check). |
+| `valor_mensalidade` | `numeric(12,2)` | Sim | — | Valor total da mensalidade (`>= 0`). |
+| `valor_grande_loja` | `numeric(12,2)` | Sim | — | Parcela da Grande Loja (`>= 0` e `<= valor_mensalidade`). |
+| `valor_loja` | `numeric(12,2)` | Sim (gerada) | `valor_mensalidade - valor_grande_loja` | Coluna `generated always as ... stored` — nunca digitada, sempre coerente com as outras duas. |
+| `vigente_desde` | `timestamptz` | Sim | `now()` | Início da vigência deste valor. |
+| `criado_por` | `uuid` | Não | — | FK → `profiles(id)`. |
+| `created_at` | `timestamptz` | Sim | `now()` | — |
+
+### Índices
+
+- `config_mensalidade_tipo_vigente_idx` em `(tipo, vigente_desde desc)` — consulta eficiente do valor vigente mais recente por tipo.
+
+### RLS
+
+- `config_mensalidade_select_authenticated` (SELECT, `authenticated`, `true`).
+- `config_mensalidade_insert_admin` (INSERT, `authenticated`, `with check public.is_admin()`). **Sem policy de UPDATE/DELETE** — a tabela é somente-inserção: alterar o valor de mensalidade sempre cria uma nova linha vigente, nunca sobrescreve uma anterior.
+
+**Por quê:** CLAUDE.md §5/§6 e SPEC §9: "alterar configuração futura nunca altera valores históricos". Por isso a tabela é insert-only e cada `mensalidades` grava seu próprio `valor_grande_loja`/`valor_loja` no momento em que é gerada (ver tabela `mensalidades` abaixo), em vez de referenciar `config_mensalidade` por FK — a competência preserva o valor histórico mesmo que uma configuração futura mude.
+
+---
+
+## Tabela: `membros`
+
+**Namespace:** `public.membros` · **Migration:** `00000000000004_membros.sql`
+
+**Responsabilidade:** Cadastro de membros da Loja.
+
+### Campos
+
+| Campo | Tipo | NOT NULL | Padrão | Descrição |
+|-------|------|----------|--------|-----------|
+| `id` | `uuid` | Sim | `gen_random_uuid()` | PK. |
+| `nome` | `text` | Sim | — | — |
+| `telefone` | `text` | Não | — | — |
+| `matricula` | `text` | Sim | — | `unique`. |
+| `do_quadro` | `boolean` | Sim | `true` | Pertence ao quadro atual da Loja. |
+| `remido` | `boolean` | Sim | `false` | Membro remido (isento de mensalidade normal — ver SPEC §9). |
+| `recolhe` | `boolean` | Sim | `false` | Indica se recolhe (flag operacional de quadro, conforme SPEC §6). |
+| `situacao` | `text` | Sim | `'ATIVO'` | `'ATIVO'` ou `'INATIVO'` (check). |
+| `data_cadastro` | `date` | Sim | `current_date` | — |
+| `created_at` / `updated_at` | `timestamptz` | Sim | `now()` | — |
+
+### Índices
+
+- `membros_situacao_idx` em `situacao`, `membros_do_quadro_idx` em `do_quadro` — filtros usados em listagens/relatórios (SPEC §6, §29).
+
+### Constraints
+
+- **Unique:** `matricula`.
+- **Check:** `situacao in ('ATIVO', 'INATIVO')`.
+
+### RLS
+
+- `membros_select_authenticated` (SELECT, `authenticated`, `true`).
+- `membros_write_admin` (ALL, `authenticated`, `public.is_admin()`).
+
+**Por quê:** SPEC §6 trata cadastro de membro como dado cadastral/institucional, não uma operação financeira do dia a dia — por isso a escrita fica restrita ao Administrador (diferente de mensalidades/pagamentos, que Tesoureiro também escreve). A transição `INATIVO → ATIVO` automática por regularização de inadimplência (CLAUDE.md §9, SPEC §7) é lógica de domínio da Fase 6, não uma policy ou trigger SQL — Fase 2 só garante a coluna `situacao` e seu `check`.
+
+### Triggers
+
+`membros_set_updated_at` (BEFORE UPDATE) → `public.set_updated_at()`.
+
+---
+
+## Tabela: `contas`
+
+**Namespace:** `public.contas` · **Migration:** `00000000000005_contas_formas_pagamento.sql`
+
+**Responsabilidade:** Contas financeiras da Loja (bancárias, caixa, etc.) que recebem/pagam movimentações.
+
+### Campos
+
+| Campo | Tipo | NOT NULL | Padrão | Descrição |
+|-------|------|----------|--------|-----------|
+| `id` | `uuid` | Sim | `gen_random_uuid()` | PK. |
+| `nome` | `text` | Sim | — | `unique`. |
+| `descricao` | `text` | Não | — | — |
+| `saldo_inicial` | `numeric(12,2)` | Sim | `0` | Saldo na data de abertura da conta no sistema (SPEC §21). |
+| `data_saldo_inicial` | `date` | Sim | — | Data de referência do `saldo_inicial`. |
+| `ativo` | `boolean` | Sim | `true` | — |
+| `created_at` / `updated_at` | `timestamptz` | Sim | `now()` | — |
+
+### Constraints
+
+- **Unique:** `nome`.
+
+### RLS
+
+- `contas_select_authenticated` (SELECT, `authenticated`, `true`).
+- `contas_write_admin` (ALL, `authenticated`, `public.is_admin()`).
+
+**Por quê:** SPEC §18 trata cadastro de contas como configuração financeira estrutural (cria/edita fonte de saldo), reservada ao Administrador; Tesoureiro movimenta saldo (mensalidades, pagamentos, transferências) mas não cria/edita contas.
+
+### Triggers
+
+`contas_set_updated_at` (BEFORE UPDATE) → `public.set_updated_at()`.
+
+---
+
+## Tabela: `formas_pagamento`
+
+**Namespace:** `public.formas_pagamento` · **Migration:** `00000000000005_contas_formas_pagamento.sql`
+
+**Responsabilidade:** Formas de pagamento aceitas (Dinheiro, PIX, etc.), referenciadas por pagamentos/doações/movimentações.
+
+### Campos
+
+| Campo | Tipo | NOT NULL | Padrão | Descrição |
+|-------|------|----------|--------|-----------|
+| `id` | `uuid` | Sim | `gen_random_uuid()` | PK. |
+| `nome` | `text` | Sim | — | `unique`. |
+| `ativo` | `boolean` | Sim | `true` | — |
+| `created_at` / `updated_at` | `timestamptz` | Sim | `now()` | — |
+
+### RLS
+
+- `formas_pagamento_select_authenticated` (SELECT, `authenticated`, `true`).
+- `formas_pagamento_write_admin` (ALL, `authenticated`, `public.is_admin()`).
+
+**Por quê:** SPEC §19 — lista estruturada de formas de pagamento é configuração, não operação financeira do dia a dia; escrita restrita ao Administrador, leitura ampla (todo lançamento financeiro referencia essa tabela).
+
+### Triggers
+
+`formas_pagamento_set_updated_at` (BEFORE UPDATE) → `public.set_updated_at()`.
+
+---
+
+## Tabela: `campanhas`
+
+**Namespace:** `public.campanhas` · **Migration:** `00000000000006_campanhas.sql`
+
+**Responsabilidade:** Campanhas de arrecadação/assistência (SPEC §24), que recebem doações.
+
+### Campos
+
+| Campo | Tipo | NOT NULL | Padrão | Descrição |
+|-------|------|----------|--------|-----------|
+| `id` | `uuid` | Sim | `gen_random_uuid()` | PK. |
+| `titulo` | `text` | Sim | — | — |
+| `objetivo` | `text` | Não | — | — |
+| `meta` | `numeric(12,2)` | Sim | — | `>= 0`. |
+| `pessoa_ajudada` | `text` | Não | — | — |
+| `contato` | `text` | Não | — | — |
+| `endereco` | `text` | Não | — | — |
+| `descricao` | `text` | Não | — | — |
+| `data_inicial` | `date` | Sim | — | — |
+| `data_final` | `date` | Não | — | — |
+| `status` | `text` | Sim | `'EM_ANDAMENTO'` | `'EM_ANDAMENTO'`, `'CONCLUIDA'`, `'CANCELADA'` (check). |
+| `created_at` / `updated_at` | `timestamptz` | Sim | `now()` | — |
+
+### Índices
+
+- `campanhas_status_idx` em `status`.
+
+### Constraints
+
+- **Check `campanhas_datas_check`:** `data_final is null or data_final >= data_inicial`.
+
+### RLS
+
+- `campanhas_select_authenticated` (SELECT, `authenticated`, `true`).
+- `campanhas_write_tesoureiro` (ALL, `authenticated`, `public.is_tesoureiro()`).
+
+**Por quê:** SPEC §24 trata campanhas como operação financeira/assistencial corrente, no mesmo grupo de mensalidades/pagamentos — Tesoureiro (que inclui Administrador via `is_tesoureiro()`) gerencia.
+
+### Triggers
+
+`campanhas_set_updated_at` (BEFORE UPDATE) → `public.set_updated_at()`.
+
+---
+
+## Tabela: `mensalidades`
+
+**Namespace:** `public.mensalidades` · **Migration:** `00000000000007_mensalidades.sql`
+
+**Responsabilidade:** Uma linha por competência (ano/mês) devida por um membro — a "competência" independente da data de pagamento (CLAUDE.md §5).
+
+### Campos
+
+| Campo | Tipo | NOT NULL | Padrão | Descrição |
+|-------|------|----------|--------|-----------|
+| `id` | `uuid` | Sim | `gen_random_uuid()` | PK. |
+| `membro_id` | `uuid` | Sim | — | FK → `membros(id)`. |
+| `ano` | `integer` | Sim | — | `2000..2100` (check). |
+| `mes` | `integer` | Sim | — | `1..12` (check). |
+| `valor_devido` | `numeric(12,2)` | Sim | — | `>= 0`. |
+| `valor_grande_loja` | `numeric(12,2)` | Sim | — | Parcela Grande Loja **desta competência**, gravada no momento da criação — histórico, não recalculada a partir de `config_mensalidade` depois. |
+| `valor_loja` | `numeric(12,2)` | Sim | — | Parcela Loja desta competência. |
+| `valor_pago` | `numeric(12,2)` | Sim | `0` | Acumulado pago (soma de `pagamento_mensalidades.valor_aplicado` para esta competência — ver decisão técnica abaixo). |
+| `saldo` | `numeric(12,2)` | Sim (gerada) | `valor_devido - valor_pago` | Coluna gerada. |
+| `status` | `text` | Sim | `'PENDENTE'` | `'PENDENTE'`, `'PARCIAL'`, `'QUITADA'`, `'CANCELADA'`, `'NAO_APLICAVEL'` (check). |
+| `data_quitacao` | `timestamptz` | Não | — | Preenchida quando `status = 'QUITADA'` (regra de domínio, Fase 6 — não há check SQL forçando a correlação). |
+| `created_at` / `updated_at` | `timestamptz` | Sim | `now()` | — |
+
+### Índices
+
+- `mensalidades_membro_idx` em `membro_id`, `mensalidades_ano_mes_idx` em `(ano, mes)`, `mensalidades_status_idx` em `status`.
+- `mensalidades_membro_ano_mes_key`: índice único **parcial** em `(membro_id, ano, mes) where status <> 'CANCELADA'` — garante uma única competência ativa por membro/ano/mês (CLAUDE.md §7), mas permite recriar a competência caso a original tenha sido cancelada.
+
+### Constraints
+
+- **Check `mensalidades_rateio_check`:** `valor_devido = valor_grande_loja + valor_loja` — rateio sempre bate (CLAUDE.md §5).
+- **Check `mensalidades_valor_pago_limite`:** `valor_pago <= valor_devido` — impede saldo negativo por pagamento excedente registrado direto na competência (pagamento acima do valor deve ser distribuído entre competências pelo operador, SPEC §13/CLAUDE.md §5, não "estourar" uma única competência).
+
+### RLS
+
+- `mensalidades_select_authenticated` (SELECT, `authenticated`, `true`).
+- `mensalidades_write_tesoureiro` (ALL, `authenticated`, `public.is_tesoureiro()`).
+
+**Por quê:** SPEC §8/§14/§15 — geração e baixa de competências é operação financeira corrente, feita por Tesoureiro/Administrador.
+
+### Triggers
+
+`mensalidades_set_updated_at` (BEFORE UPDATE) → `public.set_updated_at()`.
+
+---
+
+## Tabela: `pagamentos`
+
+**Namespace:** `public.pagamentos` · **Migration:** `00000000000008_pagamentos.sql`
+
+**Responsabilidade:** Um pagamento realizado por um membro, que pode quitar uma ou várias competências (via `pagamento_mensalidades`).
+
+### Campos
+
+| Campo | Tipo | NOT NULL | Padrão | Descrição |
+|-------|------|----------|--------|-----------|
+| `id` | `uuid` | Sim | `gen_random_uuid()` | PK. |
+| `membro_id` | `uuid` | Sim | — | FK → `membros(id)`. |
+| `valor_total` | `numeric(12,2)` | Sim | — | `> 0`. |
+| `data_pagamento` | `date` | Sim | — | Data em que o pagamento ocorreu — **diferente** da(s) competência(s) quitada(s) (CLAUDE.md §5). |
+| `conta_id` | `uuid` | Sim | — | FK → `contas(id)` — qual conta recebeu. |
+| `forma_pagamento_id` | `uuid` | Sim | — | FK → `formas_pagamento(id)`. |
+| `usuario_id` | `uuid` | Sim | — | FK → `profiles(id)` — quem registrou. |
+| `observacao` | `text` | Não | — | — |
+| `status` | `text` | Sim | `'ATIVO'` | `'ATIVO'` ou `'CANCELADO'` (check). |
+| `motivo_cancelamento` | `text` | Não | — | Obrigatório se `CANCELADO` (ver constraint). |
+| `cancelado_por` | `uuid` | Não | — | FK → `profiles(id)`. |
+| `cancelado_em` | `timestamptz` | Não | — | — |
+| `created_at` / `updated_at` | `timestamptz` | Sim | `now()` | — |
+
+### Índices
+
+- `pagamentos_membro_idx`, `pagamentos_conta_idx`, `pagamentos_data_idx`, `pagamentos_status_idx`.
+
+### Constraints
+
+- **Check `pagamentos_cancelamento_check`:** ou `status = 'ATIVO'` e os três campos de cancelamento são `null`, ou `status = 'CANCELADO'` e os três são `not null` — nunca um cancelamento "pela metade" (CLAUDE.md §8/§12: usuário, data e motivo do cancelamento sempre rastreáveis).
+
+### RLS
+
+- `pagamentos_select_authenticated` (SELECT, `authenticated`, `true`).
+- `pagamentos_write_tesoureiro` (ALL, `authenticated`, `public.is_tesoureiro()`).
+
+**Por quê:** SPEC §11/§12/§13 e CLAUDE.md §4 — todo o rastro "quem pagou, quanto, quando, qual conta, qual forma" fica nesta tabela; cancelamento nunca é DELETE físico (CLAUDE.md §8), é update de `status`.
+
+### Triggers
+
+`pagamentos_set_updated_at` (BEFORE UPDATE) → `public.set_updated_at()`.
+
+---
+
+## Tabela: `pagamento_mensalidades`
+
+**Namespace:** `public.pagamento_mensalidades` · **Migration:** `00000000000008_pagamentos.sql`
+
+**Responsabilidade:** Tabela de junção N:N entre `pagamentos` e `mensalidades` — cada linha é "este pagamento aplicou X reais nesta competência".
+
+### Campos
+
+| Campo | Tipo | NOT NULL | Padrão | Descrição |
+|-------|------|----------|--------|-----------|
+| `id` | `uuid` | Sim | `gen_random_uuid()` | PK. |
+| `pagamento_id` | `uuid` | Sim | — | FK → `pagamentos(id)`, `on delete cascade`. |
+| `mensalidade_id` | `uuid` | Sim | — | FK → `mensalidades(id)`. |
+| `valor_aplicado` | `numeric(12,2)` | Sim | — | `> 0` — quanto deste pagamento foi aplicado nesta competência. |
+| `created_at` | `timestamptz` | Sim | `now()` | — |
+
+### Índices e constraints
+
+- `pagamento_mensalidades_pagamento_idx`, `pagamento_mensalidades_mensalidade_idx`.
+- **Unique `pagamento_mensalidades_unica`:** `(pagamento_id, mensalidade_id)` — um mesmo pagamento não pode aplicar valor duas vezes na mesma competência (mas pode aplicar em várias competências diferentes — pagamento atrasado quitando abril/maio/junho, SPEC §8).
+
+### RLS
+
+- `pagamento_mensalidades_select_authenticated` (SELECT, `authenticated`, `true`).
+- `pagamento_mensalidades_write_tesoureiro` (ALL, `authenticated`, `public.is_tesoureiro()`).
+
+**Por quê:** Materializa o rateio "um pagamento pode quitar várias competências" e "pagamento parcial" do CLAUDE.md §5/SPEC §12/§13 de forma explícita e consultável, em vez de um campo solto em `mensalidades`.
+
+### Decisão técnica: consistência agregada não é imposta por trigger SQL
+
+A soma de `pagamento_mensalidades.valor_aplicado` para uma dada `mensalidade_id` deve, na prática, corresponder a `mensalidades.valor_pago` daquela competência. A Fase 2 **não** cria trigger/constraint SQL para impor essa soma automaticamente: a atualização de `mensalidades.valor_pago` e a criação das linhas de `pagamento_mensalidades` correspondentes serão feitas de forma atômica pela camada de aplicação/domínio na Fase 6 (transação de "registrar pagamento"), com testes unitários (Vitest) cobrindo os cenários de borda (pagamento parcial, pagamento quitando múltiplas competências, pagamento acima do valor). Fase 2 entrega apenas a estrutura (tabelas, FKs, constraints básicas) — a regra de consistência é responsabilidade do serviço de domínio, não do banco, para manter a lógica de negócio auditável e testável em TypeScript em vez de PL/pgSQL.
+
+---
+
+## Tabela: `doacoes`
+
+**Namespace:** `public.doacoes` · **Migration:** `00000000000009_doacoes.sql`
+
+**Responsabilidade:** Doações recebidas para uma campanha, de um doador (membro ou não).
+
+### Campos
+
+| Campo | Tipo | NOT NULL | Padrão | Descrição |
+|-------|------|----------|--------|-----------|
+| `id` | `uuid` | Sim | `gen_random_uuid()` | PK. |
+| `campanha_id` | `uuid` | Sim | — | FK → `campanhas(id)`. |
+| `doador` | `text` | Sim | — | Nome do doador (texto livre — doador pode não ser membro). |
+| `membro_id` | `uuid` | Não | — | FK → `membros(id)`, opcional (doador pode ser membro ou não). |
+| `valor` | `numeric(12,2)` | Sim | — | `> 0`. |
+| `data` | `date` | Sim | — | — |
+| `conta_id` | `uuid` | Sim | — | FK → `contas(id)`. |
+| `forma_pagamento_id` | `uuid` | Sim | — | FK → `formas_pagamento(id)`. |
+| `observacao` | `text` | Não | — | — |
+| `usuario_id` | `uuid` | Sim | — | FK → `profiles(id)` — quem registrou. |
+| `status` | `text` | Sim | `'ATIVO'` | `'ATIVO'` ou `'CANCELADO'` (check). |
+| `motivo_cancelamento` / `cancelado_por` / `cancelado_em` | — | Não | — | Igual ao padrão de `pagamentos`. |
+| `created_at` / `updated_at` | `timestamptz` | Sim | `now()` | — |
+
+### Índices
+
+- `doacoes_campanha_idx`, `doacoes_membro_idx`, `doacoes_status_idx`.
+
+### Constraints
+
+- **Check `doacoes_cancelamento_check`:** mesmo padrão par-ou-nada de `pagamentos_cancelamento_check`.
+
+### RLS
+
+- `doacoes_select_authenticated` (SELECT, `authenticated`, `true`).
+- `doacoes_write_tesoureiro` (ALL, `authenticated`, `public.is_tesoureiro()`).
+
+**Por quê:** SPEC §25 — doação é operação financeira corrente ligada a campanhas, mesma trilha de rastreabilidade e cancelamento não-destrutivo de `pagamentos`.
+
+### Triggers
+
+`doacoes_set_updated_at` (BEFORE UPDATE) → `public.set_updated_at()`.
+
+---
+
+## Tabela: `movimentacoes`
+
+**Namespace:** `public.movimentacoes` · **Migration:** `00000000000010_movimentacoes_transferencias.sql`
+
+**Responsabilidade:** Livro-caixa: toda entrada/saída financeira ativa em uma conta, incluindo as geradas por `pagamentos`/`doacoes` e as lançadas manualmente.
+
+### Campos
+
+| Campo | Tipo | NOT NULL | Padrão | Descrição |
+|-------|------|----------|--------|-----------|
+| `id` | `uuid` | Sim | `gen_random_uuid()` | PK. |
+| `data` | `date` | Sim | — | — |
+| `tipo` | `text` | Sim | — | `'ENTRADA'` ou `'SAIDA'` (check). |
+| `categoria` | `text` | Sim | — | Texto livre (categorização de despesa/receita, SPEC §17). |
+| `descricao` | `text` | Não | — | — |
+| `valor` | `numeric(12,2)` | Sim | — | `> 0`. |
+| `conta_id` | `uuid` | Sim | — | FK → `contas(id)`. |
+| `forma_pagamento_id` | `uuid` | Sim | — | FK → `formas_pagamento(id)`. |
+| `membro_id` | `uuid` | Não | — | FK → `membros(id)`, opcional. |
+| `campanha_id` | `uuid` | Não | — | FK → `campanhas(id)`, opcional. |
+| `usuario_id` | `uuid` | Sim | — | FK → `profiles(id)`. |
+| `origem` | `text` | Sim | — | Texto livre identificando a origem do lançamento (ex.: `'MANUAL'`, `'PAGAMENTO'`, `'DOACAO'`) — não é enum fechado nesta migration. |
+| `pagamento_id` | `uuid` | Não | — | FK → `pagamentos(id)`, preenchida quando a movimentação foi gerada por um pagamento de mensalidade. |
+| `doacao_id` | `uuid` | Não | — | FK → `doacoes(id)`, preenchida quando gerada por uma doação. |
+| `status` | `text` | Sim | `'ATIVO'` | `'ATIVO'` ou `'CANCELADO'` (check). |
+| `motivo_cancelamento` / `cancelado_por` / `cancelado_em` | — | Não | — | Padrão par-ou-nada. |
+| `observacao` | `text` | Não | — | — |
+| `created_at` / `updated_at` | `timestamptz` | Sim | `now()` | — |
+
+### Índices
+
+- `movimentacoes_data_idx`, `movimentacoes_tipo_idx`, `movimentacoes_conta_idx`, `movimentacoes_campanha_idx`, `movimentacoes_status_idx`.
+
+### Constraints
+
+- **Check `movimentacoes_cancelamento_check`:** mesmo padrão par-ou-nada.
+
+### RLS
+
+- `movimentacoes_select_authenticated` (SELECT, `authenticated`, `true`).
+- `movimentacoes_write_tesoureiro` (ALL, `authenticated`, `public.is_tesoureiro()`).
+
+**Por quê:** SPEC §17 — é o extrato consolidado usado para saldo de conta e relatórios (SPEC §29); `pagamento_id`/`doacao_id` opcionais preservam a rastreabilidade "qual operação originou esta movimentação" sem forçar toda movimentação a ter uma origem de mensalidade/doação (lançamentos manuais de despesa também passam por aqui).
+
+### Triggers
+
+`movimentacoes_set_updated_at` (BEFORE UPDATE) → `public.set_updated_at()`.
+
+---
+
+## Tabela: `transferencias`
+
+**Namespace:** `public.transferencias` · **Migration:** `00000000000010_movimentacoes_transferencias.sql`
+
+**Responsabilidade:** Transferência de saldo entre duas contas da Loja — não é receita nem despesa (CLAUDE.md §8), por isso é uma tabela separada de `movimentacoes`.
+
+### Campos
+
+| Campo | Tipo | NOT NULL | Padrão | Descrição |
+|-------|------|----------|--------|-----------|
+| `id` | `uuid` | Sim | `gen_random_uuid()` | PK. |
+| `conta_origem_id` | `uuid` | Sim | — | FK → `contas(id)`. |
+| `conta_destino_id` | `uuid` | Sim | — | FK → `contas(id)`. |
+| `valor` | `numeric(12,2)` | Sim | — | `> 0`. |
+| `data` | `date` | Sim | — | — |
+| `observacao` | `text` | Não | — | — |
+| `usuario_id` | `uuid` | Sim | — | FK → `profiles(id)`. |
+| `status` | `text` | Sim | `'ATIVO'` | `'ATIVO'` ou `'CANCELADO'` (check). |
+| `motivo_cancelamento` / `cancelado_por` / `cancelado_em` | — | Não | — | Padrão par-ou-nada. |
+| `created_at` / `updated_at` | `timestamptz` | Sim | `now()` | — |
+
+### Índices
+
+- `transferencias_origem_idx`, `transferencias_destino_idx`, `transferencias_status_idx`.
+
+### Constraints
+
+- **Check `transferencias_contas_diferentes`:** `conta_origem_id <> conta_destino_id` (CLAUDE.md §7 — "transferências para a mesma conta" é integridade a ser impedida).
+- **Check `transferencias_cancelamento_check`:** padrão par-ou-nada.
+
+### RLS
+
+- `transferencias_select_authenticated` (SELECT, `authenticated`, `true`).
+- `transferencias_write_tesoureiro` (ALL, `authenticated`, `public.is_tesoureiro()`).
+
+**Por quê:** SPEC §20 — movimentação entre contas próprias, feita por Tesoureiro/Administrador, com o mesmo padrão de cancelamento rastreável das demais tabelas financeiras.
+
+### Triggers
+
+`transferencias_set_updated_at` (BEFORE UPDATE) → `public.set_updated_at()`.
+
+---
+
+## Tabela: `recibos`
+
+**Namespace:** `public.recibos` · **Migration:** `00000000000011_recibos.sql`
+
+**Responsabilidade:** Registro do recibo emitido (PDF, gerado na Fase 10) para um pagamento de mensalidade ou uma doação de campanha.
+
+### Campos
+
+| Campo | Tipo | NOT NULL | Padrão | Descrição |
+|-------|------|----------|--------|-----------|
+| `id` | `uuid` | Sim | `gen_random_uuid()` | PK. |
+| `tipo` | `text` | Sim | — | `'MENSALIDADE'` ou `'CAMPANHA'` (check). |
+| `membro_id` | `uuid` | Não | — | FK → `membros(id)`, opcional (doação de campanha pode não ter membro). |
+| `pessoa` | `text` | Sim | — | Nome exibido no recibo (membro ou doador externo). |
+| `valor` | `numeric(12,2)` | Sim | — | `> 0`. |
+| `referencia` | `text` | Sim | — | Texto livre (ex.: competência quitada, ou título da campanha). |
+| `data` | `date` | Sim | — | — |
+| `descricao` | `text` | Não | — | — |
+| `assinatura_url` | `text` | Não | — | URL do PDF/assinatura em Supabase Storage (Fase 10). |
+| `usuario_id` | `uuid` | Sim | — | FK → `profiles(id)` — quem emitiu. |
+| `pagamento_id` | `uuid` | Não | — | FK → `pagamentos(id)`. |
+| `doacao_id` | `uuid` | Não | — | FK → `doacoes(id)`. |
+| `created_at` | `timestamptz` | Sim | `now()` | Sem `updated_at`: recibo não é editado (ver abaixo). |
+
+### Índices
+
+- `recibos_membro_idx`, `recibos_tipo_idx`, `recibos_data_idx`.
+
+### Constraints
+
+- **Check `recibos_origem_check`:** ou `tipo = 'MENSALIDADE'` com `pagamento_id` preenchido e `doacao_id` nulo, ou `tipo = 'CAMPANHA'` com `doacao_id` preenchido e `pagamento_id` nulo — todo recibo tem exatamente uma origem, coerente com o tipo.
+
+### RLS
+
+- `recibos_select_authenticated` (SELECT, `authenticated`, `true`).
+- `recibos_insert_tesoureiro` (INSERT, `authenticated`, `with check public.is_tesoureiro()`).
+- **Sem policy de UPDATE/DELETE.**
+
+**Por quê:** SPEC §27 — um recibo é um documento fiscal/histórico emitido; alterá-lo ou apagá-lo depois quebraria a rastreabilidade do que foi entregue ao pagador. A tabela é insert-only por design: para corrigir um recibo emitido errado, a Fase 10 deve emitir um novo (ou registrar um cancelamento na tabela de origem), nunca fazer UPDATE.
+
+---
+
+## Tabela: `fechamentos_mensais`
+
+**Namespace:** `public.fechamentos_mensais` · **Migration:** `00000000000012_fechamentos_mensais.sql`
+
+**Responsabilidade:** Fechamento contábil mensal — snapshot consolidado de saldo/entradas/saídas do mês, com abertura/fechamento/reabertura controlados por perfil.
+
+### Campos
+
+| Campo | Tipo | NOT NULL | Padrão | Descrição |
+|-------|------|----------|--------|-----------|
+| `id` | `uuid` | Sim | `gen_random_uuid()` | PK. |
+| `ano` | `integer` | Sim | — | `2000..2100` (check). |
+| `mes` | `integer` | Sim | — | `1..12` (check). |
+| `saldo_inicial` | `numeric(12,2)` | Sim | — | Saldo agregado no início do mês. |
+| `total_entradas` | `numeric(12,2)` | Sim | — | — |
+| `total_saidas` | `numeric(12,2)` | Sim | — | — |
+| `total_transferencias` | `numeric(12,2)` | Sim | — | Volume transferido entre contas no mês (informativo — não entra na conta de `saldo_final`, pois transferência não é receita/despesa, CLAUDE.md §8). |
+| `saldo_final` | `numeric(12,2)` | Sim | — | Ver constraint abaixo. |
+| `status` | `text` | Sim | `'ABERTO'` | `'ABERTO'` ou `'FECHADO'` (check). |
+| `fechado_por` / `fechado_em` | `uuid` / `timestamptz` | Não | — | FK → `profiles(id)` / — . |
+| `reaberto_por` / `reaberto_em` | `uuid` / `timestamptz` | Não | — | FK → `profiles(id)` / — . |
+| `motivo_reabertura` | `text` | Não | — | — |
+| `created_at` / `updated_at` | `timestamptz` | Sim | `now()` | — |
+
+### Índices e constraints
+
+- `fechamentos_mensais_ano_mes_idx`, `fechamentos_mensais_status_idx`.
+- **Unique `fechamentos_mensais_ano_mes_key`:** `(ano, mes)`.
+- **Check `fechamentos_mensais_saldo_check`:** `saldo_final = saldo_inicial + total_entradas - total_saidas`.
+
+### RLS
+
+- `fechamentos_select_authenticated` (SELECT, `authenticated`, `true`).
+- `fechamentos_insert_tesoureiro` (INSERT, `authenticated`, `with check public.is_tesoureiro()`).
+- `fechamentos_update_tesoureiro` (UPDATE, `authenticated`, `using (public.is_tesoureiro() and status = 'ABERTO')`, `with check public.is_tesoureiro()`) — Tesoureiro só edita/fecha um fechamento que ainda está `ABERTO`; depois de `FECHADO`, essa policy deixa de autorizar a linha (o `using` falha), então Tesoureiro **não consegue reabrir**.
+- `fechamentos_update_admin` (UPDATE, `authenticated`, `public.is_admin()`) — sem restrição de `status` no `using`, então Administrador pode atualizar (inclusive reabrir) um fechamento em qualquer status.
+- **Duas policies de UPDATE distintas** implementam a regra "Tesoureiro fecha, só Administrador reabre" diretamente no RLS (Postgres aplica `OR` entre múltiplas policies permissivas da mesma ação) — não é uma checagem só na aplicação.
+
+**Por quê:** SPEC §22 e CLAUDE.md §10 — fechar o mês é operação financeira de rotina (Tesoureiro), mas reabrir um mês já fechado é uma exceção sensível (mexe em período supostamente encerrado) e fica reservada ao Administrador, e essa restrição precisa valer mesmo que alguém chame a API diretamente — daí ser modelada como duas policies RLS em vez de uma validação só no formulário.
+
+### Decisão técnica: um fechamento por mês, agregado, não por conta
+
+`fechamentos_mensais` tem exatamente uma linha por `(ano, mes)`, cobrindo **todas as contas combinadas** — não existe um fechamento por conta individual. Saldo/entrada/saída por conta continuam consultáveis a qualquer momento via `movimentacoes`/`contas` e serão expostos como um relatório à parte (SPEC §29, item 6 — "saldo por conta"), não como uma tabela de fechamento por conta. Fechar o mês é um evento contábil único da Loja como um todo.
+
+### Triggers
+
+`fechamentos_mensais_set_updated_at` (BEFORE UPDATE) → `public.set_updated_at()`.
+
+---
+
+## Tabela: `repasses_grande_loja`
+
+**Namespace:** `public.repasses_grande_loja` · **Migration:** `00000000000013_repasses_grande_loja.sql`
+
+**Responsabilidade:** Um envio de repasse à Grande Loja (o "lote" de envio), consolidando um ou mais itens de `repasses_grande_loja_itens`.
+
+### Campos
+
+| Campo | Tipo | NOT NULL | Padrão | Descrição |
+|-------|------|----------|--------|-----------|
+| `id` | `uuid` | Sim | `gen_random_uuid()` | PK. |
+| `data_envio` | `date` | Sim | — | — |
+| `usuario_id` | `uuid` | Sim | — | FK → `profiles(id)` — quem registrou o envio. |
+| `valor_total` | `numeric(12,2)` | Sim | — | `>= 0`. |
+| `observacao` | `text` | Não | — | — |
+| `status` | `text` | Sim | `'ENVIADO'` | `'ENVIADO'` ou `'CANCELADO'` (check). |
+| `created_at` / `updated_at` | `timestamptz` | Sim | `now()` | — |
+
+### RLS
+
+- `repasses_select_authenticated` (SELECT, `authenticated`, `true`).
+- `repasses_write_tesoureiro` (ALL, `authenticated`, `public.is_tesoureiro()`).
+
+**Por quê:** SPEC §15/§16 — registrar o envio à Grande Loja é operação financeira de rotina do Tesoureiro, com rastreabilidade de quem/quando (CLAUDE.md §4).
+
+### Triggers
+
+`repasses_grande_loja_set_updated_at` (BEFORE UPDATE) → `public.set_updated_at()`.
+
+---
+
+## Tabela: `repasses_grande_loja_itens`
+
+**Namespace:** `public.repasses_grande_loja_itens` · **Migration:** `00000000000013_repasses_grande_loja.sql`
+
+**Responsabilidade:** Um item pendente/enviado de repasse — a parcela de Grande Loja de **uma competência específica** (`mensalidades.valor_grande_loja`), rastreável desde "pendente de envio" até "incluída em um repasse enviado".
+
+### Campos
+
+| Campo | Tipo | NOT NULL | Padrão | Descrição |
+|-------|------|----------|--------|-----------|
+| `id` | `uuid` | Sim | `gen_random_uuid()` | PK. |
+| `mensalidade_id` | `uuid` | Sim | — | FK → `mensalidades(id)`, **`unique`** — cada competência gera no máximo um item de repasse (CLAUDE.md §5: "cada competência gera seu próprio valor de Grande Loja"). |
+| `repasse_id` | `uuid` | Não | — | FK → `repasses_grande_loja(id)` — **nullable por design**, ver decisão técnica abaixo. |
+| `valor` | `numeric(12,2)` | Sim | — | `> 0`. |
+| `status` | `text` | Sim | `'PENDENTE'` | `'PENDENTE'`, `'ENVIADO'`, `'CANCELADO'` (check). |
+| `created_at` / `updated_at` | `timestamptz` | Sim | `now()` | — |
+
+### Índices e constraints
+
+- `repasses_itens_repasse_idx`, `repasses_itens_status_idx`.
+- **Check `repasses_itens_repasse_status_check`:** ou `repasse_id is null` e `status = 'PENDENTE'`, ou `repasse_id is not null` e `status in ('ENVIADO', 'CANCELADO')` — um item só pertence a um repasse enviado depois de deixar de estar pendente, e vice-versa.
+
+### RLS
+
+- `repasses_itens_select_authenticated` (SELECT, `authenticated`, `true`).
+- `repasses_itens_write_tesoureiro` (ALL, `authenticated`, `public.is_tesoureiro()`).
+
+**Por quê:** SPEC §15/§16 — cada competência quitada precisa gerar seu próprio valor de Grande Loja rastreável (CLAUDE.md §5), separado do "lote" de envio em si.
+
+### Decisão técnica: `repasse_id` nullable é proposital
+
+Diferente de um FK obrigatório, `repasse_id` começa `null` (item `PENDENTE`, ainda não incluído em nenhum envio). A **criação automática** de um item de `repasses_grande_loja_itens` no momento em que uma `mensalidade` é quitada (status → `QUITADA`) é regra de negócio da **Fase 9** (Grande Loja), não desta fase — Fase 2 só cria a estrutura da tabela e a constraint que amarra `status`/`repasse_id`. Até lá, linhas em `repasses_grande_loja_itens` só existem se inseridas manualmente/por seed.
+
+### Triggers
+
+`repasses_itens_set_updated_at` (BEFORE UPDATE) → `public.set_updated_at()`.
+
+---
+
+## Tabela: `auditoria`
+
+**Namespace:** `public.auditoria` · **Migration:** `00000000000014_auditoria.sql`
+
+**Responsabilidade:** Log de auditoria de operações críticas (CLAUDE.md §12) — quem fez o quê, quando, com dados antes/depois.
+
+### Campos
+
+| Campo | Tipo | NOT NULL | Padrão | Descrição |
+|-------|------|----------|--------|-----------|
+| `id` | `uuid` | Sim | `gen_random_uuid()` | PK. |
+| `usuario_id` | `uuid` | Não | — | FK → `profiles(id)`. `nullable` para permitir registro de ações do sistema sem usuário interativo associado. |
+| `modulo` | `text` | Sim | — | Ex.: `'PAGAMENTOS'`, `'FECHAMENTO'`, `'USUARIOS'`. |
+| `acao` | `text` | Sim | — | Ex.: `'CRIAR'`, `'CANCELAR'`, `'FECHAR'`. |
+| `registro_tabela` | `text` | Não | — | Nome da tabela afetada (referência textual, não FK — a auditoria precisa sobreviver mesmo que o registro original seja referenciado por múltiplas tabelas diferentes). |
+| `registro_id` | `uuid` | Não | — | Id do registro afetado. |
+| `dados_anteriores` | `jsonb` | Não | — | Snapshot antes da mudança. |
+| `dados_novos` | `jsonb` | Não | — | Snapshot depois da mudança. |
+| `descricao` | `text` | Não | — | — |
+| `created_at` | `timestamptz` | Sim | `now()` | Sem `updated_at`: log nunca é editado. |
+
+### Índices
+
+- `auditoria_usuario_idx`, `auditoria_modulo_idx`, `auditoria_created_at_idx` (desc, para listagens recentes primeiro), `auditoria_registro_idx` em `(registro_tabela, registro_id)` (consultar histórico de um registro específico).
+
+### RLS
+
+- `auditoria_select_admin` (SELECT, `authenticated`, `public.is_admin()`) — só Administrador lê o log de auditoria.
+- **Sem nenhuma policy de INSERT/UPDATE/DELETE client-side.** Igual ao padrão já estabelecido para `profiles` na Fase 1: a escrita em `auditoria` é feita exclusivamente por Server Actions com `service_role` (a serem implementadas junto com cada módulo que precisa auditar — pagamentos, cancelamentos, configurações, fechamento, reabertura, Grande Loja, usuários — conforme CLAUDE.md §12), nunca pelo client autenticado comum. Isso impede que um usuário (mesmo mal-intencionado com o anon key) manipule ou apague seu próprio rastro de auditoria.
+
+**Por quê:** SPEC §30 e CLAUDE.md §12 — auditoria só tem valor se for imutável e não puder ser forjada/apagada por quem está sendo auditado; nem Tesoureiro nem Administrador conseguem escrever diretamente via client, apenas ler (Administrador).
+
+---
+
+## Decisões técnicas — Fase 2 (resumo)
+
+Além das decisões documentadas junto de cada tabela acima, ficam registradas aqui para referência rápida:
+
+1. **Consistência agregada de pagamentos não é imposta por trigger SQL.** A soma de `pagamento_mensalidades.valor_aplicado` por `mensalidade_id` deve refletir `mensalidades.valor_pago`, mas essa consistência é garantida pela camada de aplicação/domínio na Fase 6 (transação atômica de "registrar pagamento" + testes Vitest), não por trigger ou constraint SQL. Fase 2 entrega só a estrutura (FKs, constraints básicas por linha).
+2. **`fechamentos_mensais` é um fechamento agregado por `(ano, mes)`, não por conta.** Não existe fechamento por conta individual; saldo por conta é relatório separado (SPEC §29, item 6).
+3. **`repasses_grande_loja_itens.repasse_id` é nullable de propósito.** A criação automática de um item de repasse quando uma mensalidade é quitada é regra de negócio da Fase 9, ainda não implementada — Fase 2 só entrega a tabela e a constraint que amarra `status` a `repasse_id`.
+4. **Mapa de escrita por perfil via RLS:**
+   - **Administrador** (`is_admin()`): escreve em tudo, incluindo `membros`, `contas`, `formas_pagamento`, `loja_config`, `config_mensalidade` (que Tesoureiro não escreve), e é o único que pode **reabrir** um `fechamentos_mensais` (`fechamentos_update_admin`).
+   - **Tesoureiro** (`is_tesoureiro()`, que também é `true` para Administrador): escreve em `mensalidades`, `pagamentos`, `pagamento_mensalidades`, `movimentacoes`, `transferencias`, `campanhas`, `doacoes`, `repasses_grande_loja`/`repasses_grande_loja_itens`; só **insere** em `recibos` (sem update/delete); pode **fechar** (`fechamentos_insert_tesoureiro`/`fechamentos_update_tesoureiro`, este último só enquanto `status = 'ABERTO'`) mas não reabrir um `fechamentos_mensais`.
+   - A restrição "só Administrador reabre" é enforced com **duas policies RLS de UPDATE separadas** (`fechamentos_update_tesoureiro` com `status = 'ABERTO'` no `using`, e `fechamentos_update_admin` sem essa restrição) — não é validação só na aplicação.
+   - **Consulta:** somente leitura em todas as tabelas com policy de `select` (todas exceto `auditoria`, que é exclusiva de Administrador).
+5. **`recibos` é insert-only**, sem policy de UPDATE/DELETE — mesmo padrão de imutabilidade já usado em `auditoria` (Fase 1/2, sem nenhuma policy de escrita client-side) e em `config_mensalidade` (insert-only, sem update/delete). Corrigir um recibo/config errado nunca é um UPDATE, é uma nova linha (ou, no caso de `auditoria`, nem isso — é escrita via `service_role` apenas).
+
+---
+
 ## Decisões de Design
 
 ### Senhas e Autenticação
@@ -91,7 +794,22 @@ Essa separação entre read-only (RLS strict) e write (service role centralizado
 
 Migrations SQL são versionadas numericamente sob `supabase/migrations/`:
 
-- `00000000000001_profiles.sql` — Criação da tabela profiles com RLS e trigger
+- `00000000000001_profiles.sql` — Tabela `profiles` com RLS e trigger `set_updated_at()`.
+- `00000000000002_auth_helpers.sql` — Funções `current_profile_role()`, `is_admin()`, `is_tesoureiro()`.
+- `00000000000003_loja_config_mensalidade.sql` — `loja_config`, `config_mensalidade`.
+- `00000000000004_membros.sql` — `membros`.
+- `00000000000005_contas_formas_pagamento.sql` — `contas`, `formas_pagamento`.
+- `00000000000006_campanhas.sql` — `campanhas`.
+- `00000000000007_mensalidades.sql` — `mensalidades`.
+- `00000000000008_pagamentos.sql` — `pagamentos`, `pagamento_mensalidades`.
+- `00000000000009_doacoes.sql` — `doacoes`.
+- `00000000000010_movimentacoes_transferencias.sql` — `movimentacoes`, `transferencias`.
+- `00000000000011_recibos.sql` — `recibos`.
+- `00000000000012_fechamentos_mensais.sql` — `fechamentos_mensais`.
+- `00000000000013_repasses_grande_loja.sql` — `repasses_grande_loja`, `repasses_grande_loja_itens`.
+- `00000000000014_auditoria.sql` — `auditoria`.
+
+`supabase/seed.sql` (não numerado, não é migration) contém dados de desenvolvimento: formas de pagamento padrão e a linha singleton de `loja_config`. Não é aplicado automaticamente em produção.
 
 **Regra crítica:** Migrations nunca são editadas após aplicação em um banco de dados real. Se houver erro, cria-se uma nova migration para corrigir.
 
@@ -107,6 +825,11 @@ Migrations SQL são versionadas numericamente sob `supabase/migrations/`:
 
 ## Próximas Fases
 
-- **Fase 2:** Tabelas de domínio (membros, competências, mensalidades, contas, etc.).
-- **Fase 3:** Permissões granulares e Server Actions de administração de usuários.
-- **Fase 4+:** Dados financeiros e histórico com rastreabilidade.
+- **Fase 3:** Permissões granulares e Server Actions de administração de usuários (CRUD de `profiles` via `service_role`).
+- **Fase 4:** Interface de Configurações (edição de `loja_config`/`config_mensalidade` pelo Administrador).
+- **Fase 5:** Cadastro de membros (UI sobre `membros`).
+- **Fase 6:** Mensalidades e pagamentos — geração de competências, registro de pagamento (parcial/atrasado/acima do valor), e a lógica de domínio que mantém `pagamento_mensalidades` consistente com `mensalidades.valor_pago` (ver decisão técnica na seção `pagamento_mensalidades` acima).
+- **Fase 7/8:** Financeiro (movimentações, transferências) e campanhas/doações.
+- **Fase 9:** Grande Loja — geração automática de itens de `repasses_grande_loja_itens` ao quitar uma mensalidade.
+- **Fase 10:** Recibos em PDF.
+- **Fase 11+:** Relatórios, dashboard, segurança/revisão, testes, deploy — conforme CLAUDE.md §14.
