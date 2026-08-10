@@ -61,19 +61,30 @@ export async function criarUsuario(
   })
 
   if (profileError) {
-    await supabaseAdmin.auth.admin.deleteUser(created.user.id)
+    try {
+      await supabaseAdmin.auth.admin.deleteUser(created.user.id)
+    } catch (rollbackError) {
+      console.error('Falha ao reverter criação de usuário órfão:', rollbackError)
+      return {
+        error: `Falha ao criar perfil (${profileError.message}) e também falhou ao reverter o usuário criado — contate o suporte técnico com o ID ${created.user.id}.`,
+      }
+    }
     return { error: `Falha ao criar perfil: ${profileError.message}` }
   }
 
-  await registrarAuditoria({
-    usuarioId: admin.id,
-    modulo: 'usuarios',
-    acao: 'CRIACAO',
-    registroTabela: 'profiles',
-    registroId: created.user.id,
-    dadosNovos: { username, nome: input.nome.trim(), role, ativo: true },
-    descricao: `Criação do usuário ${username}`,
-  })
+  try {
+    await registrarAuditoria({
+      usuarioId: admin.id,
+      modulo: 'usuarios',
+      acao: 'CRIACAO',
+      registroTabela: 'profiles',
+      registroId: created.user.id,
+      dadosNovos: { username, nome: input.nome.trim(), role, ativo: true },
+      descricao: `Criação do usuário ${username}`,
+    })
+  } catch (auditError) {
+    console.error('Falha ao registrar auditoria (usuário criado com sucesso):', auditError)
+  }
 
   revalidatePath('/configuracoes/usuarios')
   return { success: 'Usuário criado com sucesso.' }
@@ -112,16 +123,20 @@ export async function atualizarUsuario(
     return { error: `Falha ao atualizar usuário: ${error.message}` }
   }
 
-  await registrarAuditoria({
-    usuarioId: admin.id,
-    modulo: 'usuarios',
-    acao: 'EDICAO',
-    registroTabela: 'profiles',
-    registroId: id,
-    dadosAnteriores: anterior ?? null,
-    dadosNovos: { nome: nome.trim(), role },
-    descricao: `Edição do usuário ${id}`,
-  })
+  try {
+    await registrarAuditoria({
+      usuarioId: admin.id,
+      modulo: 'usuarios',
+      acao: 'EDICAO',
+      registroTabela: 'profiles',
+      registroId: id,
+      dadosAnteriores: anterior ?? null,
+      dadosNovos: { nome: nome.trim(), role },
+      descricao: `Edição do usuário ${id}`,
+    })
+  } catch (auditError) {
+    console.error('Falha ao registrar auditoria (usuário atualizado com sucesso):', auditError)
+  }
 
   revalidatePath('/configuracoes/usuarios')
   return {}
@@ -152,16 +167,23 @@ export async function alterarStatusUsuario(id: string, ativo: boolean): Promise<
     return { error: `Falha ao atualizar status: ${error.message}` }
   }
 
-  await registrarAuditoria({
-    usuarioId: admin.id,
-    modulo: 'usuarios',
-    acao: ativo ? 'REATIVACAO' : 'DESATIVACAO',
-    registroTabela: 'profiles',
-    registroId: id,
-    dadosAnteriores: anterior ?? null,
-    dadosNovos: { ativo },
-    descricao: `${ativo ? 'Reativação' : 'Desativação'} do usuário ${id}`,
-  })
+  try {
+    await registrarAuditoria({
+      usuarioId: admin.id,
+      modulo: 'usuarios',
+      acao: ativo ? 'REATIVACAO' : 'DESATIVACAO',
+      registroTabela: 'profiles',
+      registroId: id,
+      dadosAnteriores: anterior ?? null,
+      dadosNovos: { ativo },
+      descricao: `${ativo ? 'Reativação' : 'Desativação'} do usuário ${id}`,
+    })
+  } catch (auditError) {
+    console.error(
+      `Falha ao registrar auditoria (usuário ${ativo ? 'reativado' : 'desativado'} com sucesso):`,
+      auditError
+    )
+  }
 
   revalidatePath('/configuracoes/usuarios')
   return {}
@@ -186,14 +208,18 @@ export async function redefinirSenha(id: string, novaSenha: string): Promise<{ e
     return { error: `Falha ao redefinir senha: ${error.message}` }
   }
 
-  await registrarAuditoria({
-    usuarioId: admin.id,
-    modulo: 'usuarios',
-    acao: 'REDEFINICAO_SENHA',
-    registroTabela: 'profiles',
-    registroId: id,
-    descricao: `Redefinição de senha do usuário ${id}`,
-  })
+  try {
+    await registrarAuditoria({
+      usuarioId: admin.id,
+      modulo: 'usuarios',
+      acao: 'REDEFINICAO_SENHA',
+      registroTabela: 'profiles',
+      registroId: id,
+      descricao: `Redefinição de senha do usuário ${id}`,
+    })
+  } catch (auditError) {
+    console.error('Falha ao registrar auditoria (senha redefinida com sucesso):', auditError)
+  }
 
   revalidatePath('/configuracoes/usuarios')
   return {}
