@@ -12,7 +12,6 @@ create table public.mensalidades (
   data_quitacao timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint mensalidades_membro_ano_mes_key unique (membro_id, ano, mes),
   constraint mensalidades_rateio_check check (valor_devido = valor_grande_loja + valor_loja),
   constraint mensalidades_valor_pago_limite check (valor_pago <= valor_devido)
 );
@@ -20,6 +19,9 @@ create table public.mensalidades (
 create index mensalidades_membro_idx on public.mensalidades (membro_id);
 create index mensalidades_ano_mes_idx on public.mensalidades (ano, mes);
 create index mensalidades_status_idx on public.mensalidades (status);
+create unique index mensalidades_membro_ano_mes_key
+  on public.mensalidades (membro_id, ano, mes)
+  where status <> 'CANCELADA';
 
 alter table public.mensalidades enable row level security;
 
