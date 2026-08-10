@@ -93,7 +93,7 @@ As três são `stable`, `security definer` e `set search_path = ''`, seguindo o 
 ### RLS
 
 - `loja_config_select_authenticated` (SELECT, `authenticated`, `true`): qualquer usuário logado lê a config (nome/logo aparecem no header/layout para todos os perfis).
-- `loja_config_write_admin` (ALL, `authenticated`, `using/with check public.is_admin()`): só Administrador escreve.
+- `loja_config_write_admin_insert` / `loja_config_write_admin_update` (INSERT/UPDATE, `authenticated`, `using/with check public.is_admin()`): só Administrador escreve. Desde `00000000000015_fase2_correcoes.sql`, sem policy de DELETE.
 
 **Por quê:** SPEC §28 (Configurações) reserva a edição de dados institucionais da Loja ao Administrador; leitura precisa ser ampla porque o nome/logo aparece na UI para todos.
 
@@ -168,7 +168,7 @@ As três são `stable`, `security definer` e `set search_path = ''`, seguindo o 
 ### RLS
 
 - `membros_select_authenticated` (SELECT, `authenticated`, `true`).
-- `membros_write_admin` (ALL, `authenticated`, `public.is_admin()`).
+- `membros_write_admin_insert` / `membros_write_admin_update` (INSERT/UPDATE, `authenticated`, `public.is_admin()`) — desde `00000000000015_fase2_correcoes.sql`, sem policy de DELETE.
 
 **Por quê:** SPEC §6 trata cadastro de membro como dado cadastral/institucional, não uma operação financeira do dia a dia — por isso a escrita fica restrita ao Administrador (diferente de mensalidades/pagamentos, que Tesoureiro também escreve). A transição `INATIVO → ATIVO` automática por regularização de inadimplência (CLAUDE.md §9, SPEC §7) é lógica de domínio da Fase 6, não uma policy ou trigger SQL — Fase 2 só garante a coluna `situacao` e seu `check`.
 
@@ -203,7 +203,7 @@ As três são `stable`, `security definer` e `set search_path = ''`, seguindo o 
 ### RLS
 
 - `contas_select_authenticated` (SELECT, `authenticated`, `true`).
-- `contas_write_admin` (ALL, `authenticated`, `public.is_admin()`).
+- `contas_write_admin_insert` / `contas_write_admin_update` (INSERT/UPDATE, `authenticated`, `public.is_admin()`) — desde `00000000000015_fase2_correcoes.sql`, sem policy de DELETE.
 
 **Por quê:** SPEC §18 trata cadastro de contas como configuração financeira estrutural (cria/edita fonte de saldo), reservada ao Administrador; Tesoureiro movimenta saldo (mensalidades, pagamentos, transferências) mas não cria/edita contas.
 
@@ -231,7 +231,7 @@ As três são `stable`, `security definer` e `set search_path = ''`, seguindo o 
 ### RLS
 
 - `formas_pagamento_select_authenticated` (SELECT, `authenticated`, `true`).
-- `formas_pagamento_write_admin` (ALL, `authenticated`, `public.is_admin()`).
+- `formas_pagamento_write_admin_insert` / `formas_pagamento_write_admin_update` (INSERT/UPDATE, `authenticated`, `public.is_admin()`) — desde `00000000000015_fase2_correcoes.sql`, sem policy de DELETE.
 
 **Por quê:** SPEC §19 — lista estruturada de formas de pagamento é configuração, não operação financeira do dia a dia; escrita restrita ao Administrador, leitura ampla (todo lançamento financeiro referencia essa tabela).
 
@@ -275,7 +275,7 @@ As três são `stable`, `security definer` e `set search_path = ''`, seguindo o 
 ### RLS
 
 - `campanhas_select_authenticated` (SELECT, `authenticated`, `true`).
-- `campanhas_write_tesoureiro` (ALL, `authenticated`, `public.is_tesoureiro()`).
+- `campanhas_write_tesoureiro_insert` / `campanhas_write_tesoureiro_update` (INSERT/UPDATE, `authenticated`, `public.is_tesoureiro()`) — desde `00000000000015_fase2_correcoes.sql`, sem policy de DELETE.
 
 **Por quê:** SPEC §24 trata campanhas como operação financeira/assistencial corrente, no mesmo grupo de mensalidades/pagamentos — Tesoureiro (que inclui Administrador via `is_tesoureiro()`) gerencia.
 
@@ -317,11 +317,12 @@ As três são `stable`, `security definer` e `set search_path = ''`, seguindo o 
 
 - **Check `mensalidades_rateio_check`:** `valor_devido = valor_grande_loja + valor_loja` — rateio sempre bate (CLAUDE.md §5).
 - **Check `mensalidades_valor_pago_limite`:** `valor_pago <= valor_devido` — impede saldo negativo por pagamento excedente registrado direto na competência (pagamento acima do valor deve ser distribuído entre competências pelo operador, SPEC §13/CLAUDE.md §5, não "estourar" uma única competência).
+- **Checks `valor_grande_loja >= 0` e `valor_loja >= 0`** — impedem parcelas negativas no rateio da competência.
 
 ### RLS
 
 - `mensalidades_select_authenticated` (SELECT, `authenticated`, `true`).
-- `mensalidades_write_tesoureiro` (ALL, `authenticated`, `public.is_tesoureiro()`).
+- `mensalidades_write_tesoureiro_insert` / `mensalidades_write_tesoureiro_update` (INSERT/UPDATE, `authenticated`, `public.is_tesoureiro()`) — desde `00000000000015_fase2_correcoes.sql`, que fechou a policy `for all` original para não conceder DELETE implícito; não existe policy de DELETE, então a exclusão física é negada por padrão pelo RLS.
 
 **Por quê:** SPEC §8/§14/§15 — geração e baixa de competências é operação financeira corrente, feita por Tesoureiro/Administrador.
 
@@ -366,9 +367,9 @@ As três são `stable`, `security definer` e `set search_path = ''`, seguindo o 
 ### RLS
 
 - `pagamentos_select_authenticated` (SELECT, `authenticated`, `true`).
-- `pagamentos_write_tesoureiro` (ALL, `authenticated`, `public.is_tesoureiro()`).
+- `pagamentos_write_tesoureiro_insert` / `pagamentos_write_tesoureiro_update` (INSERT/UPDATE, `authenticated`, `public.is_tesoureiro()`) — desde `00000000000015_fase2_correcoes.sql`.
 
-**Por quê:** SPEC §11/§12/§13 e CLAUDE.md §4 — todo o rastro "quem pagou, quanto, quando, qual conta, qual forma" fica nesta tabela; cancelamento nunca é DELETE físico (CLAUDE.md §8), é update de `status`.
+**Por quê:** SPEC §11/§12/§13 e CLAUDE.md §4 — todo o rastro "quem pagou, quanto, quando, qual conta, qual forma" fica nesta tabela; cancelamento nunca é DELETE físico (CLAUDE.md §8), é update de `status` — e desde `00000000000015_fase2_correcoes.sql` isso não é mais só uma convenção de aplicação: o RLS efetivamente nega qualquer tentativa de DELETE, pois não existe policy de delete para esta tabela.
 
 ### Triggers
 
@@ -387,7 +388,7 @@ As três são `stable`, `security definer` e `set search_path = ''`, seguindo o 
 | Campo | Tipo | NOT NULL | Padrão | Descrição |
 |-------|------|----------|--------|-----------|
 | `id` | `uuid` | Sim | `gen_random_uuid()` | PK. |
-| `pagamento_id` | `uuid` | Sim | — | FK → `pagamentos(id)`, `on delete cascade`. |
+| `pagamento_id` | `uuid` | Sim | — | FK → `pagamentos(id)`, `on delete restrict` (apertado de `on delete cascade` por `00000000000015_fase2_correcoes.sql` — excluir um pagamento nunca deve apagar silenciosamente seus vínculos com competências). |
 | `mensalidade_id` | `uuid` | Sim | — | FK → `mensalidades(id)`. |
 | `valor_aplicado` | `numeric(12,2)` | Sim | — | `> 0` — quanto deste pagamento foi aplicado nesta competência. |
 | `created_at` | `timestamptz` | Sim | `now()` | — |
@@ -400,7 +401,7 @@ As três são `stable`, `security definer` e `set search_path = ''`, seguindo o 
 ### RLS
 
 - `pagamento_mensalidades_select_authenticated` (SELECT, `authenticated`, `true`).
-- `pagamento_mensalidades_write_tesoureiro` (ALL, `authenticated`, `public.is_tesoureiro()`).
+- `pagamento_mensalidades_write_tesoureiro_insert` / `pagamento_mensalidades_write_tesoureiro_update` (INSERT/UPDATE, `authenticated`, `public.is_tesoureiro()`) — desde `00000000000015_fase2_correcoes.sql`.
 
 **Por quê:** Materializa o rateio "um pagamento pode quitar várias competências" e "pagamento parcial" do CLAUDE.md §5/SPEC §12/§13 de forma explícita e consultável, em vez de um campo solto em `mensalidades`.
 
@@ -445,7 +446,7 @@ A soma de `pagamento_mensalidades.valor_aplicado` para uma dada `mensalidade_id`
 ### RLS
 
 - `doacoes_select_authenticated` (SELECT, `authenticated`, `true`).
-- `doacoes_write_tesoureiro` (ALL, `authenticated`, `public.is_tesoureiro()`).
+- `doacoes_write_tesoureiro_insert` / `doacoes_write_tesoureiro_update` (INSERT/UPDATE, `authenticated`, `public.is_tesoureiro()`) — desde `00000000000015_fase2_correcoes.sql`, sem policy de DELETE.
 
 **Por quê:** SPEC §25 — doação é operação financeira corrente ligada a campanhas, mesma trilha de rastreabilidade e cancelamento não-destrutivo de `pagamentos`.
 
@@ -495,7 +496,7 @@ A soma de `pagamento_mensalidades.valor_aplicado` para uma dada `mensalidade_id`
 ### RLS
 
 - `movimentacoes_select_authenticated` (SELECT, `authenticated`, `true`).
-- `movimentacoes_write_tesoureiro` (ALL, `authenticated`, `public.is_tesoureiro()`).
+- `movimentacoes_write_tesoureiro_insert` / `movimentacoes_write_tesoureiro_update` (INSERT/UPDATE, `authenticated`, `public.is_tesoureiro()`) — desde `00000000000015_fase2_correcoes.sql`, sem policy de DELETE.
 
 **Por quê:** SPEC §17 — é o extrato consolidado usado para saldo de conta e relatórios (SPEC §29); `pagamento_id`/`doacao_id` opcionais preservam a rastreabilidade "qual operação originou esta movimentação" sem forçar toda movimentação a ter uma origem de mensalidade/doação (lançamentos manuais de despesa também passam por aqui).
 
@@ -538,7 +539,7 @@ A soma de `pagamento_mensalidades.valor_aplicado` para uma dada `mensalidade_id`
 ### RLS
 
 - `transferencias_select_authenticated` (SELECT, `authenticated`, `true`).
-- `transferencias_write_tesoureiro` (ALL, `authenticated`, `public.is_tesoureiro()`).
+- `transferencias_write_tesoureiro_insert` / `transferencias_write_tesoureiro_update` (INSERT/UPDATE, `authenticated`, `public.is_tesoureiro()`) — desde `00000000000015_fase2_correcoes.sql`, sem policy de DELETE.
 
 **Por quê:** SPEC §20 — movimentação entre contas próprias, feita por Tesoureiro/Administrador, com o mesmo padrão de cancelamento rastreável das demais tabelas financeiras.
 
@@ -619,6 +620,11 @@ A soma de `pagamento_mensalidades.valor_aplicado` para uma dada `mensalidade_id`
 - `fechamentos_mensais_ano_mes_idx`, `fechamentos_mensais_status_idx`.
 - **Unique `fechamentos_mensais_ano_mes_key`:** `(ano, mes)`.
 - **Check `fechamentos_mensais_saldo_check`:** `saldo_final = saldo_inicial + total_entradas - total_saidas`.
+- **Check `fechamentos_mensais_fechado_auditoria_check`** (adicionada por `00000000000015_fase2_correcoes.sql`): `status <> 'FECHADO' or (fechado_por is not null and fechado_em is not null)` — um fechamento não pode estar `FECHADO` sem registrar quem/quando fechou. Não força `reaberto_por`/`reaberto_em`/`motivo_reabertura` a `null` quando `status = 'ABERTO'`: depois de uma reabertura o registro volta a `ABERTO`, mas esses campos permanecem preenchidos como histórico da última reabertura.
+
+### Limitação conhecida: bloqueio de período não é imposto pelo banco
+
+SPEC §22 pede para "bloquear alterações normais daquele período" quando um mês está `FECHADO`. A Fase 2 **não** implementa esse bloqueio no banco: não há trigger impedindo o INSERT de uma `movimentacao` ou `pagamento` com `data`/`data_pagamento` dentro de um mês já `FECHADO`. Essa validação fica deferida para a camada de aplicação na Fase 7 (Financeiro), que deve checar o `status` do `fechamentos_mensais` correspondente antes de gravar lançamentos retroativos.
 
 ### RLS
 
@@ -661,7 +667,7 @@ A soma de `pagamento_mensalidades.valor_aplicado` para uma dada `mensalidade_id`
 ### RLS
 
 - `repasses_select_authenticated` (SELECT, `authenticated`, `true`).
-- `repasses_write_tesoureiro` (ALL, `authenticated`, `public.is_tesoureiro()`).
+- `repasses_write_tesoureiro_insert` / `repasses_write_tesoureiro_update` (INSERT/UPDATE, `authenticated`, `public.is_tesoureiro()`) — desde `00000000000015_fase2_correcoes.sql`, sem policy de DELETE.
 
 **Por quê:** SPEC §15/§16 — registrar o envio à Grande Loja é operação financeira de rotina do Tesoureiro, com rastreabilidade de quem/quando (CLAUDE.md §4).
 
@@ -696,7 +702,7 @@ A soma de `pagamento_mensalidades.valor_aplicado` para uma dada `mensalidade_id`
 ### RLS
 
 - `repasses_itens_select_authenticated` (SELECT, `authenticated`, `true`).
-- `repasses_itens_write_tesoureiro` (ALL, `authenticated`, `public.is_tesoureiro()`).
+- `repasses_itens_write_tesoureiro_insert` / `repasses_itens_write_tesoureiro_update` (INSERT/UPDATE, `authenticated`, `public.is_tesoureiro()`) — desde `00000000000015_fase2_correcoes.sql`, sem policy de DELETE.
 
 **Por quê:** SPEC §15/§16 — cada competência quitada precisa gerar seu próprio valor de Grande Loja rastreável (CLAUDE.md §5), separado do "lote" de envio em si.
 
@@ -750,13 +756,14 @@ Além das decisões documentadas junto de cada tabela acima, ficam registradas a
 
 1. **Consistência agregada de pagamentos não é imposta por trigger SQL.** A soma de `pagamento_mensalidades.valor_aplicado` por `mensalidade_id` deve refletir `mensalidades.valor_pago`, mas essa consistência é garantida pela camada de aplicação/domínio na Fase 6 (transação atômica de "registrar pagamento" + testes Vitest), não por trigger ou constraint SQL. Fase 2 entrega só a estrutura (FKs, constraints básicas por linha).
 2. **`fechamentos_mensais` é um fechamento agregado por `(ano, mes)`, não por conta.** Não existe fechamento por conta individual; saldo por conta é relatório separado (SPEC §29, item 6).
-3. **`repasses_grande_loja_itens.repasse_id` é nullable de propósito.** A criação automática de um item de repasse quando uma mensalidade é quitada é regra de negócio da Fase 9, ainda não implementada — Fase 2 só entrega a tabela e a constraint que amarra `status` a `repasse_id`.
+3. **`repasses_grande_loja_itens.repasse_id` é nullable de propósito.** A criação automática de um item de repasse quando uma mensalidade é quitada é regra de negócio da Fase 9, ainda não implementada — Fase 2 só entrega a tabela e a constraint que amarra `status` a `repasse_id`; a constraint foi corrigida em `00000000000015_fase2_correcoes.sql` para permitir `CANCELADO` mesmo com `repasse_id is null`.
 4. **Mapa de escrita por perfil via RLS:**
    - **Administrador** (`is_admin()`): escreve em tudo, incluindo `membros`, `contas`, `formas_pagamento`, `loja_config`, `config_mensalidade` (que Tesoureiro não escreve), e é o único que pode **reabrir** um `fechamentos_mensais` (`fechamentos_update_admin`).
    - **Tesoureiro** (`is_tesoureiro()`, que também é `true` para Administrador): escreve em `mensalidades`, `pagamentos`, `pagamento_mensalidades`, `movimentacoes`, `transferencias`, `campanhas`, `doacoes`, `repasses_grande_loja`/`repasses_grande_loja_itens`; só **insere** em `recibos` (sem update/delete); pode **fechar** (`fechamentos_insert_tesoureiro`/`fechamentos_update_tesoureiro`, este último só enquanto `status = 'ABERTO'`) mas não reabrir um `fechamentos_mensais`.
    - A restrição "só Administrador reabre" é enforced com **duas policies RLS de UPDATE separadas** (`fechamentos_update_tesoureiro` com `status = 'ABERTO'` no `using`, e `fechamentos_update_admin` sem essa restrição) — não é validação só na aplicação.
    - **Consulta:** somente leitura em todas as tabelas com policy de `select` (todas exceto `auditoria`, que é exclusiva de Administrador).
 5. **`recibos` é insert-only**, sem policy de UPDATE/DELETE — mesmo padrão de imutabilidade já usado em `auditoria` (Fase 1/2, sem nenhuma policy de escrita client-side) e em `config_mensalidade` (insert-only, sem update/delete). Corrigir um recibo/config errado nunca é um UPDATE, é uma nova linha (ou, no caso de `auditoria`, nem isso — é escrita via `service_role` apenas).
+6. **DELETE fechado por RLS em 13 tabelas.** `00000000000015_fase2_correcoes.sql` fechou as policies `for all` originais (que concediam DELETE implícito) de `loja_config`, `membros`, `contas`, `formas_pagamento`, `campanhas`, `mensalidades`, `pagamentos`, `pagamento_mensalidades`, `doacoes`, `movimentacoes`, `transferencias`, `repasses_grande_loja` e `repasses_grande_loja_itens`, substituindo-as por policies de `insert`/`update` — sem policy de `delete`, o RLS nega exclusão física por padrão.
 
 ---
 
@@ -784,7 +791,7 @@ A política `profiles_select_authenticated` permite que qualquer usuário autent
 - Desativar/ativar usuário
 - Deletar usuário
 
-Essas operações não possuem políticas RLS no client. Em vez disso, são executadas via Server Action Next.js com credencial `service_role`, que contorna RLS e permite implementar lógica crítica de negócio (validações, auditoria, logs).
+Essas operações não possuem políticas RLS no client. Em vez disso, são executadas via Server Action Next.js com credencial `service_role`, que contorna RLS e permite implementar lógica crítica de negócio (validações, auditoria, logs). Nota: "Deletar usuário" aqui é diferente do bloqueio de DELETE fechado por `00000000000015_fase2_correcoes.sql` nas 13 tabelas financeiras/cadastrais (`membros`, `contas`, etc.) — naquelas, o DELETE client-side é negado pelo RLS por não existir policy correspondente; aqui, `profiles` nem tem policy de escrita client-side alguma, e a exclusão (quando implementada na Fase 3) passa inteiramente por `service_role`, que ignora RLS.
 
 Essa separação entre read-only (RLS strict) e write (service role centralizado) é padrão em aplicações financeiras.
 
@@ -808,6 +815,7 @@ Migrations SQL são versionadas numericamente sob `supabase/migrations/`:
 - `00000000000012_fechamentos_mensais.sql` — `fechamentos_mensais`.
 - `00000000000013_repasses_grande_loja.sql` — `repasses_grande_loja`, `repasses_grande_loja_itens`.
 - `00000000000014_auditoria.sql` — `auditoria`.
+- `00000000000015_fase2_correcoes.sql` — Correções do review final da Fase 2: (1) fecha as policies `for all` de 13 tabelas financeiras/cadastrais que concediam DELETE implícito, substituindo-as por policies separadas de `insert`/`update` sem policy de `delete`; (2) aperta `pagamento_mensalidades.pagamento_id` de `on delete cascade` para `on delete restrict`; (3) corrige `repasses_itens_repasse_status_check` para permitir um item ainda não agrupado em repasse (`repasse_id is null`) ser marcado `CANCELADO`; (4) adiciona `fechamentos_mensais_fechado_auditoria_check` exigindo `fechado_por`/`fechado_em` quando `status = 'FECHADO'`.
 
 `supabase/seed.sql` (não numerado, não é migration) contém dados de desenvolvimento: formas de pagamento padrão e a linha singleton de `loja_config`. Não é aplicado automaticamente em produção.
 
