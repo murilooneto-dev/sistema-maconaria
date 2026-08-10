@@ -83,6 +83,7 @@ export function UsuariosTable({
                   <EditForm
                     usuario={usuario}
                     pending={isPending}
+                    isSelf={usuario.id === currentUserId}
                     onCancel={() => setEditingId(null)}
                     onSave={(nome, role) => {
                       startTransition(async () => {
@@ -155,11 +156,13 @@ export function UsuariosTable({
 function EditForm({
   usuario,
   pending,
+  isSelf,
   onSave,
   onCancel,
 }: {
   usuario: Usuario
   pending: boolean
+  isSelf: boolean
   onSave: (nome: string, role: Usuario['role']) => void
   onCancel: () => void
 }) {
@@ -176,12 +179,18 @@ function EditForm({
       <select
         value={role}
         onChange={(e) => setRole(e.target.value as Usuario['role'])}
-        className="w-full rounded border border-slate-300 px-2 py-1 text-sm"
+        disabled={isSelf}
+        className="w-full rounded border border-slate-300 px-2 py-1 text-sm disabled:opacity-50"
       >
         <option value="ADMINISTRADOR">Administrador</option>
         <option value="TESOUREIRO">Tesoureiro</option>
         <option value="CONSULTA">Consulta</option>
       </select>
+      {isSelf && (
+        <p className="text-xs text-slate-500">
+          Você não pode alterar seu próprio perfil de acesso.
+        </p>
+      )}
       <div className="space-x-2">
         <button
           type="button"

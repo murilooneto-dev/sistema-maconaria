@@ -8,6 +8,14 @@ function roleValido(role: string): role is Role {
   return (ROLES as readonly string[]).includes(role)
 }
 
+export function validarSenha(senha: string): ValidationResult {
+  if (senha.length < 8) {
+    return { valido: false, erro: 'A senha deve ter pelo menos 8 caracteres.' }
+  }
+
+  return { valido: true }
+}
+
 export function validarNovoUsuario(input: {
   username: string
   nome: string
@@ -35,8 +43,9 @@ export function validarNovoUsuario(input: {
     return { valido: false, erro: 'Perfil inválido.' }
   }
 
-  if (input.senha.length < 8) {
-    return { valido: false, erro: 'A senha deve ter pelo menos 8 caracteres.' }
+  const senhaValidacao = validarSenha(input.senha)
+  if (!senhaValidacao.valido) {
+    return senhaValidacao
   }
 
   return { valido: true }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { validarEdicaoUsuario, validarNovoUsuario } from './usuarios'
+import { validarEdicaoUsuario, validarNovoUsuario, validarSenha } from './usuarios'
 
 describe('validarNovoUsuario', () => {
   const base = { username: 'joao.silva', nome: 'João Silva', role: 'CONSULTA', senha: 'senha1234' }
@@ -60,6 +60,19 @@ describe('validarEdicaoUsuario', () => {
     expect(validarEdicaoUsuario({ nome: 'João Silva', role: 'X' })).toEqual({
       valido: false,
       erro: 'Perfil inválido.',
+    })
+  })
+})
+
+describe('validarSenha', () => {
+  it('aceita uma senha válida', () => {
+    expect(validarSenha('senha1234')).toEqual({ valido: true })
+  })
+
+  it('rejeita senha com menos de 8 caracteres', () => {
+    expect(validarSenha('1234567')).toEqual({
+      valido: false,
+      erro: 'A senha deve ter pelo menos 8 caracteres.',
     })
   })
 })

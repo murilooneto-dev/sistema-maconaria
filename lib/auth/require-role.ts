@@ -1,3 +1,4 @@
+import 'server-only'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { canAccess, type PerfilAutorizacao, type Role } from '@/lib/domain/authorization'
 

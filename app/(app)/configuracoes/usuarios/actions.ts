@@ -5,7 +5,7 @@ import { requireAdmin, AuthorizationError } from '@/lib/auth/require-role'
 import { createSupabaseServiceRoleClient } from '@/lib/supabase/service'
 import { registrarAuditoria } from '@/lib/audit'
 import { normalizeUsername, usernameToAuthEmail } from '@/lib/domain/auth'
-import { validarEdicaoUsuario, validarNovoUsuario } from '@/lib/domain/usuarios'
+import { validarEdicaoUsuario, validarNovoUsuario, validarSenha } from '@/lib/domain/usuarios'
 import type { Role } from '@/lib/domain/authorization'
 
 type CriarUsuarioState = { error: string } | { success: string } | undefined
@@ -114,6 +114,10 @@ export async function atualizarUsuario(
     return { error: validacao.erro }
   }
 
+  if (admin.id === id && role !== 'ADMINISTRADOR') {
+    return { error: 'Você não pode alterar seu próprio perfil de acesso.' }
+  }
+
   const supabaseAdmin = createSupabaseServiceRoleClient()
   const { data: anterior } = await supabaseAdmin
     .from('profiles')
@@ -121,13 +125,15 @@ export async function atualizarUsuario(
     .eq('id', id)
     .single()
 
-  const { error } = await supabaseAdmin
+  const { data: atualizado, error } = await supabaseAdmin
     .from('profiles')
     .update({ nome: nome.trim(), role })
     .eq('id', id)
+    .select('id')
+    .single()
 
-  if (error) {
-    return { error: `Falha ao atualizar usuário: ${error.message}` }
+  if (error || !atualizado) {
+    return { error: `Falha ao atualizar usuário: ${error?.message ?? 'usuário não encontrado.'}` }
   }
 
   try {
@@ -168,10 +174,15 @@ export async function alterarStatusUsuario(id: string, ativo: boolean): Promise<
     .eq('id', id)
     .single()
 
-  const { error } = await supabaseAdmin.from('profiles').update({ ativo }).eq('id', id)
+  const { data: atualizado, error } = await supabaseAdmin
+    .from('profiles')
+    .update({ ativo })
+    .eq('id', id)
+    .select('id')
+    .single()
 
-  if (error) {
-    return { error: `Falha ao atualizar status: ${error.message}` }
+  if (error || !atualizado) {
+    return { error: `Falha ao atualizar status: ${error?.message ?? 'usuário não encontrado.'}` }
   }
 
   try {
@@ -204,8 +215,9 @@ export async function redefinirSenha(id: string, novaSenha: string): Promise<{ e
     return { error: mensagemAutorizacao(err) }
   }
 
-  if (novaSenha.length < 8) {
-    return { error: 'A senha deve ter pelo menos 8 caracteres.' }
+  const validacaoSenha = validarSenha(novaSenha)
+  if (!validacaoSenha.valido) {
+    return { error: validacaoSenha.erro }
   }
 
   const supabaseAdmin = createSupabaseServiceRoleClient()
