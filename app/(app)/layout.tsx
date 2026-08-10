@@ -19,9 +19,14 @@ export default async function AppLayout({
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('nome, role')
+    .select('nome, role, ativo')
     .eq('id', user.id)
     .single()
+
+  if (!profile || profile.ativo === false) {
+    await supabase.auth.signOut()
+    redirect('/login')
+  }
 
   return (
     <div className="flex min-h-screen">
