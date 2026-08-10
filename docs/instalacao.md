@@ -78,6 +78,8 @@ Isso cria a tabela `public.profiles` (com RLS habilitado) e o trigger de `update
 
 ## 6. Criar o primeiro usuário ADMINISTRADOR
 
+> **Nota (Fase 3):** a partir da Fase 3, um Administrador já existente pode criar novos usuários pela tela `/configuracoes/usuarios`. Este passo manual (SQL Editor) só é necessário para o **primeiro** Administrador do sistema, quando ainda não existe nenhum usuário.
+
 A Fase 1 não inclui tela de administração de usuários (isso é escopo da Fase 3). Para conseguir logar pela primeira vez, crie o usuário manualmente:
 
 ### 6.1. Criar o usuário em `auth.users`

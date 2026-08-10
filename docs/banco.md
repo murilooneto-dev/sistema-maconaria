@@ -748,6 +748,8 @@ Diferente de um FK obrigatório, `repasse_id` começa `null` (item `PENDENTE`, a
 
 **Por quê:** SPEC §30 e CLAUDE.md §12 — auditoria só tem valor se for imutável e não puder ser forjada/apagada por quem está sendo auditado; nem Tesoureiro nem Administrador conseguem escrever diretamente via client, apenas ler (Administrador).
 
+**Nota (Fase 3):** A partir da Fase 3, toda escrita em `auditoria` passa por `lib/audit.ts` (`registrarAuditoria`), chamado pelas Server Actions administrativas — nunca diretamente do client. Ver [`docs/permissoes.md`](./permissoes.md) para a explicação completa de por que essas Server Actions (que usam `service_role`) são a única camada de autorização nesse caso.
+
 ---
 
 ## Decisões técnicas — Fase 2 (resumo)

@@ -36,18 +36,33 @@ Este documento descreve a estrutura de pastas e o fluxo de autenticação implem
 │       ├── grande-loja/page.tsx  # Placeholder (fase futura)
 │       ├── recibos/page.tsx      # Placeholder (fase futura)
 │       ├── relatorios/page.tsx   # Placeholder (fase futura)
-│       └── configuracoes/page.tsx# Placeholder (fase futura)
+│       └── configuracoes/
+│           ├── page.tsx          # Hub de configurações (links para os submódulos, incl. Usuários)
+│           └── usuarios/
+│               ├── page.tsx           # Lista de usuários (Server Component, checa role=ADMINISTRADOR)
+│               ├── actions.ts         # Server Actions: criarUsuario, atualizarUsuario, alterarStatusUsuario, redefinirSenha
+│               ├── NovoUsuarioForm.tsx# Formulário de criação (Client Component, useActionState)
+│               └── UsuariosTable.tsx  # Tabela de usuários com ações de editar/ativar-desativar/redefinir senha
 ├── components/
+│   ├── AcessoNegado.tsx          # Mensagem padrão de "sem permissão" para páginas restritas por role
 │   └── layout/
 │       ├── Sidebar.tsx           # Navegação lateral fixa (links para os módulos)
 │       └── Header.tsx            # Cabeçalho: nome/role do usuário logado + botão Sair
 ├── lib/
+│   ├── audit.ts                  # registrarAuditoria() — único caminho de escrita em `auditoria` (via service_role)
+│   ├── auth/
+│   │   └── require-role.ts       # requireAdmin(), requireTesoureiro(), AuthorizationError
 │   ├── domain/
 │   │   ├── auth.ts               # normalizeUsername(), usernameToAuthEmail()
-│   │   └── auth.test.ts          # Testes unitários do mapeamento username→email
+│   │   ├── auth.test.ts          # Testes unitários do mapeamento username→email
+│   │   ├── authorization.ts      # canAccess() — regra pura de decisão de autorização por role
+│   │   ├── authorization.test.ts # Testes unitários de canAccess()
+│   │   ├── usuarios.ts           # validarNovoUsuario(), validarEdicaoUsuario()
+│   │   └── usuarios.test.ts      # Testes unitários de validação de usuário
 │   └── supabase/
 │       ├── client.ts             # createSupabaseBrowserClient() — uso em Client Components
 │       ├── server.ts             # createSupabaseServerClient() — uso em Server Components/Actions
+│       ├── service.ts            # createSupabaseServiceRoleClient() — client service_role, protegido por `server-only`
 │       └── middleware.ts         # updateSession() — validação/refresh de sessão a cada request
 ├── proxy.ts                      # Proxy do Next.js (antigo middleware.ts), delega para lib/supabase/middleware.ts
 ├── supabase/
@@ -57,6 +72,7 @@ Este documento descreve a estrutura de pastas e o fluxo de autenticação implem
 ├── docs/
 │   ├── arquitetura.md            # Este arquivo
 │   ├── banco.md                  # Schema, RLS, constraints, decisões de design
+│   ├── permissoes.md             # Matriz de permissões por perfil e as duas camadas de enforcement (RLS + requireAdmin/requireTesoureiro)
 │   └── instalacao.md             # Passo a passo de setup local
 ├── SPEC_Loja_Maconica.md         # Especificação funcional/técnica (fonte de verdade)
 ├── CLAUDE.md                     # Regras permanentes de desenvolvimento
