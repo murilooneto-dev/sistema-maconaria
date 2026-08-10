@@ -49,7 +49,7 @@ Este documento descreve a estrutura de pastas e o fluxo de autenticação implem
 │       ├── client.ts             # createSupabaseBrowserClient() — uso em Client Components
 │       ├── server.ts             # createSupabaseServerClient() — uso em Server Components/Actions
 │       └── middleware.ts         # updateSession() — validação/refresh de sessão a cada request
-├── middleware.ts                 # Middleware do Next.js, delega para lib/supabase/middleware.ts
+├── proxy.ts                      # Proxy do Next.js (antigo middleware.ts), delega para lib/supabase/middleware.ts
 ├── supabase/
 │   └── migrations/
 │       └── 00000000000001_profiles.sql  # Tabela profiles + RLS + trigger updated_at
@@ -81,7 +81,7 @@ Passo a passo:
 
 4. **Cookie de sessão.** O client de servidor (`@supabase/ssr`) grava os cookies de sessão (access/refresh token) na resposta via `cookieStore.set()`. Em caso de sucesso, `signIn()` redireciona para `/dashboard`.
 
-5. **Middleware valida a sessão a cada request.** `middleware.ts` (raiz) delega para `updateSession()` em `lib/supabase/middleware.ts`, que roda em todo request (exceto assets estáticos, conforme `config.matcher`). Ele:
+5. **Proxy (middleware) valida a sessão a cada request.** `proxy.ts` (raiz — o antigo `middleware.ts`, renomeado por conta da convenção introduzida no Next.js 16) delega para `updateSession()` em `lib/supabase/middleware.ts`, que roda em todo request (exceto assets estáticos, conforme `config.matcher`). Ele:
    - cria um client Supabase de servidor ligado aos cookies do request/response;
    - chama `supabase.auth.getUser()` para validar/renovar a sessão;
    - se não há usuário autenticado e a rota não é `/login`, redireciona para `/login`;
