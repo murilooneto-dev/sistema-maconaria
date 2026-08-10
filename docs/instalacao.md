@@ -88,6 +88,15 @@ No painel Supabase, vá em **Authentication → Users → Add user → Create ne
 - **Password**: defina uma senha forte temporária.
 - Marque **Auto Confirm User** (para não depender de confirmação por e-mail, já que o e-mail é fictício).
 
+> ⚠️ **Cuidado com autocomplete/autocorreção do teclado ou navegador ao digitar o e-mail.** É comum o campo "completar" `loja.internal` para `loja.internal.com` ou `lojainterna.com` sem você perceber. Depois de digitar, confira o valor **letra por letra** antes de salvar, ou valide direto no banco:
+> ```sql
+> select id, email from auth.users;
+> ```
+> Se o e-mail salvo não for exatamente `<username>@loja.internal`, o login falha com "usuário ou senha inválido" mesmo com a senha certa (porque o app monta esse e-mail exato para autenticar — `lib/domain/auth.ts`). Se o campo de e-mail do Dashboard não permitir edição direta, corrija via SQL Editor em vez de tentar editar de novo pela tela:
+> ```sql
+> update auth.users set email = 'admin@loja.internal' where id = 'UUID-DO-USUARIO';
+> ```
+
 > Criar usuários diretamente via `insert into auth.users` não é recomendado nem suportado pelo Supabase (a tabela tem triggers e requisitos internos de hashing de senha). Use sempre a tela **Authentication → Users** do Dashboard ou a Admin API (`supabase.auth.admin.createUser`) para criar o registro em `auth.users`.
 
 Depois de criar o usuário, copie o **UUID** gerado (coluna `id` na listagem de usuários).
@@ -137,6 +146,6 @@ npm run build      # build de produção
 
 ---
 
-## 9. Pendência conhecida
+## 9. Validação end-to-end
 
-Login e as políticas de RLS só podem ser validados ponta-a-ponta contra um projeto Supabase real (não há mock/stub de Supabase na Fase 1). Assim que as credenciais de um projeto Supabase forem fornecidas, deve-se: aplicar as migrations (passo 5) e criar o primeiro usuário ADMINISTRADOR (passo 6) para validar o fluxo completo de autenticação em ambiente real.
+Login, RLS e o fluxo completo de autenticação (middleware + revalidação no layout + carregamento de perfil) foram validados em 2026-08-10 contra um projeto Supabase real, seguindo exatamente os passos 3-6 acima.
