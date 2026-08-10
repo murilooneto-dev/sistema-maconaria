@@ -17,7 +17,7 @@ Este documento descreve o schema do banco de dados, políticas de Row Level Secu
 | Campo | Tipo | NOT NULL | Padrão | Descrição |
 |-------|------|----------|--------|-----------|
 | `id` | `uuid` | Sim | — | Primary Key. Referencia `auth.users(id)` com ON DELETE CASCADE. |
-| `username` | `text` | Sim | — | Nome de usuário único (case-sensitive). Indexado com LOWER para buscas case-insensitive. |
+| `username` | `text` | Sim | — | Nome de usuário. Armazenado em minúsculas (`check (username ~ '^[a-z0-9._-]+$')`); unicidade garantida por índice único em `lower(username)`, não por `unique` simples na coluna. |
 | `nome` | `text` | Sim | — | Nome completo do usuário. |
 | `role` | `text` | Sim | — | Papel no sistema. CHECK constraint: `'ADMINISTRADOR'`, `'TESOUREIRO'`, ou `'CONSULTA'`. |
 | `ativo` | `boolean` | Sim | `true` | Status de atividade do perfil. |
@@ -31,7 +31,7 @@ Este documento descreve o schema do banco de dados, políticas de Row Level Secu
 ### Constraints
 
 - **Primary Key:** `id` referencia `auth.users(id)` com ON DELETE CASCADE
-- **Unique:** `username` deve ser único
+- **Unique:** `lower(username)` deve ser único (índice único `profiles_username_idx`)
 - **Check:** `role` deve estar em ('ADMINISTRADOR', 'TESOUREIRO', 'CONSULTA')
 
 ### Row Level Security (RLS)
@@ -100,7 +100,7 @@ Migrations SQL são versionadas numericamente sob `supabase/migrations/`:
 ## Deploy
 
 - Migrations são aplicadas via `supabase db push` (ambiente local/dev) ou via Supabase Dashboard (produção).
-- Cada migration é idempotente quando possível.
+- Migrations não são idempotentes em geral (usam `create table`/`create policy` puros): cada arquivo deve ser executado exatamente uma vez contra um dado banco. `00000000000001_profiles.sql`, em particular, não pode ser colado novamente no SQL Editor após já ter sido aplicado — rodaria em erro por objetos já existentes. Ver a "Opção B" em `docs/instalacao.md`, que é uma alternativa ao `supabase db push` para a primeira aplicação, não um passo repetível.
 - Alterações estruturais em produção exigem planejamento de downtime mínimo.
 
 ---
