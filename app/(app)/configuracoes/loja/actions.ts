@@ -12,6 +12,13 @@ function mensagemAutorizacao(err: unknown): string {
   return err instanceof AuthorizationError ? err.message : 'Não autorizado.'
 }
 
+function sanitizarNomeArquivo(nome: string): string {
+  return nome
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // remove acentos
+    .replace(/[^a-zA-Z0-9.-]/g, '_') // troca qualquer coisa que não seja letra/número/ponto/hífen por _
+}
+
 export async function atualizarLoja(
   _prevState: ActionState,
   formData: FormData
@@ -34,7 +41,7 @@ export async function atualizarLoja(
   let logoUrl: string | undefined
 
   if (logo instanceof File && logo.size > 0) {
-    const path = `logo/${Date.now()}-${logo.name}`
+    const path = `logo/${Date.now()}-${sanitizarNomeArquivo(logo.name)}`
     const { error: uploadError } = await supabaseAdmin.storage
       .from('loja-assets')
       .upload(path, logo, { upsert: false })

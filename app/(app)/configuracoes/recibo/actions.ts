@@ -11,6 +11,13 @@ function mensagemAutorizacao(err: unknown): string {
   return err instanceof AuthorizationError ? err.message : 'Não autorizado.'
 }
 
+function sanitizarNomeArquivo(nome: string): string {
+  return nome
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // remove acentos
+    .replace(/[^a-zA-Z0-9.-]/g, '_') // troca qualquer coisa que não seja letra/número/ponto/hífen por _
+}
+
 export async function atualizarAssinatura(
   _prevState: ActionState,
   formData: FormData
@@ -28,7 +35,7 @@ export async function atualizarAssinatura(
   }
 
   const supabaseAdmin = createSupabaseServiceRoleClient()
-  const path = `assinaturas/${Date.now()}-${assinatura.name}`
+  const path = `assinaturas/${Date.now()}-${sanitizarNomeArquivo(assinatura.name)}`
 
   const { error: uploadError } = await supabaseAdmin.storage
     .from('loja-assets')
