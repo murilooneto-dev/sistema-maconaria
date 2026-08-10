@@ -62,7 +62,14 @@ export async function criarUsuario(
 
   if (profileError) {
     try {
-      await supabaseAdmin.auth.admin.deleteUser(created.user.id)
+      const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(created.user.id)
+
+      if (deleteError) {
+        console.error('Falha ao reverter criação de usuário órfão:', deleteError)
+        return {
+          error: `Falha ao criar perfil (${profileError.message}) e também falhou ao reverter o usuário criado — contate o suporte técnico com o ID ${created.user.id}.`,
+        }
+      }
     } catch (rollbackError) {
       console.error('Falha ao reverter criação de usuário órfão:', rollbackError)
       return {
