@@ -49,19 +49,19 @@ Este documento descreve a estrutura de pastas e o fluxo de autenticação implem
 │           │   └── actions.ts         # Server Action atualizarLoja() — upload em loja-assets/logo via service_role
 │           ├── mensalidades/
 │           │   ├── page.tsx           # Valor vigente + histórico de config_mensalidade (tipo NORMAL)
-│           │   └── actions.ts         # Server Action criarConfigMensalidade() — insert-only (histórico preservado)
+│           │   └── actions.ts         # Server Action salvarConfigMensalidade() — insert-only (histórico preservado)
 │           ├── remidos/
-│           │   └── page.tsx           # Mesma tela/lógica de mensalidades, filtrada para tipo REMIDO (reusa ConfigMensalidadeForm)
+│           │   └── page.tsx           # Mesma tela/lógica de mensalidades, filtrada para tipo REMIDO (reusa ConfigMensalidadeForm); não tem actions.ts próprio — reusa ../mensalidades/actions.ts
 │           ├── contas/
 │           │   ├── page.tsx           # Lista de contas (Server Component, admin-only)
 │           │   ├── ContasTable.tsx    # Tabela com toggle ativo/inativo (sem delete físico)
 │           │   ├── NovaContaForm.tsx  # Formulário de criação (Client Component, useActionState)
-│           │   └── actions.ts         # Server Actions: criarConta, alterarStatusConta
+│           │   └── actions.ts         # Server Actions: criarConta, atualizarConta
 │           ├── formas-pagamento/
 │           │   ├── page.tsx                    # Lista de formas de pagamento (Server Component, admin-only)
 │           │   ├── FormasPagamentoTable.tsx     # Tabela com toggle ativo/inativo (sem delete físico)
 │           │   ├── NovaFormaPagamentoForm.tsx   # Formulário de criação (Client Component, useActionState)
-│           │   └── actions.ts                  # Server Actions: criarFormaPagamento, alterarStatusFormaPagamento
+│           │   └── actions.ts                  # Server Actions: criarFormaPagamento, atualizarFormaPagamento
 │           └── recibo/
 │               ├── page.tsx           # Edição da assinatura usada nos recibos (Server Component, admin-only)
 │               ├── AssinaturaForm.tsx # Formulário (Client Component, useActionState) com upload de assinatura

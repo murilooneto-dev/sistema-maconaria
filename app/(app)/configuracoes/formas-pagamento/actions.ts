@@ -37,6 +37,9 @@ export async function criarFormaPagamento(
     .single()
 
   if (error || !criada) {
+    if (error?.code === '23505') {
+      return { error: 'Já existe uma forma de pagamento com esse nome.' }
+    }
     return { error: `Falha ao criar forma de pagamento: ${error?.message ?? 'erro desconhecido'}` }
   }
 
