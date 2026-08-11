@@ -65,10 +65,19 @@ export async function atualizarLoja(
     dadosNovos.logo_url = logoUrl
   }
 
-  const { error } = await supabaseAdmin.from('loja_config').update(dadosNovos).eq('id', 1)
+  const { data: atualizado, error } = await supabaseAdmin
+    .from('loja_config')
+    .update(dadosNovos)
+    .eq('id', 1)
+    .select('id')
+    .single()
 
-  if (error) {
-    return { error: `Falha ao atualizar dados da loja: ${error.message}` }
+  if (error || !atualizado) {
+    return {
+      error: error
+        ? `Falha ao atualizar dados da loja: ${error.message}`
+        : 'Registro de configuração da Loja não encontrado — contate o suporte técnico.',
+    }
   }
 
   try {

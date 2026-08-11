@@ -38,14 +38,12 @@ export async function atualizarAssinatura(
   const path = `assinaturas/${Date.now()}-${sanitizarNomeArquivo(assinatura.name)}`
 
   const { error: uploadError } = await supabaseAdmin.storage
-    .from('loja-assets')
+    .from('loja-assinaturas')
     .upload(path, assinatura, { upsert: false })
 
   if (uploadError) {
     return { error: `Falha ao enviar assinatura: ${uploadError.message}` }
   }
-
-  const { data: publicUrlData } = supabaseAdmin.storage.from('loja-assets').getPublicUrl(path)
 
   const { data: anterior } = await supabaseAdmin
     .from('loja_config')
@@ -53,13 +51,19 @@ export async function atualizarAssinatura(
     .eq('id', 1)
     .single()
 
-  const { error } = await supabaseAdmin
+  const { data: atualizado, error } = await supabaseAdmin
     .from('loja_config')
-    .update({ assinatura_url: publicUrlData.publicUrl })
+    .update({ assinatura_url: path })
     .eq('id', 1)
+    .select('id')
+    .single()
 
-  if (error) {
-    return { error: `Falha ao salvar assinatura: ${error.message}` }
+  if (error || !atualizado) {
+    return {
+      error: error
+        ? `Falha ao salvar assinatura: ${error.message}`
+        : 'Registro de configuração da Loja não encontrado — contate o suporte técnico.',
+    }
   }
 
   try {
@@ -69,7 +73,7 @@ export async function atualizarAssinatura(
       acao: 'EDICAO_ASSINATURA_RECIBO',
       registroTabela: 'loja_config',
       dadosAnteriores: anterior ?? null,
-      dadosNovos: { assinatura_url: publicUrlData.publicUrl },
+      dadosNovos: { assinatura_url: path },
       descricao: 'Atualização da assinatura usada nos recibos',
     })
   } catch (auditError) {
