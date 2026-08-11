@@ -37,14 +37,39 @@ Este documento descreve a estrutura de pastas e o fluxo de autenticação implem
 │       ├── recibos/page.tsx      # Placeholder (fase futura)
 │       ├── relatorios/page.tsx   # Placeholder (fase futura)
 │       └── configuracoes/
-│           ├── page.tsx          # Hub de configurações (links para os submódulos, incl. Usuários)
-│           └── usuarios/
-│               ├── page.tsx           # Lista de usuários (Server Component, checa role=ADMINISTRADOR)
-│               ├── actions.ts         # Server Actions: criarUsuario, atualizarUsuario, alterarStatusUsuario, redefinirSenha
-│               ├── NovoUsuarioForm.tsx# Formulário de criação (Client Component, useActionState)
-│               └── UsuariosTable.tsx  # Tabela de usuários com ações de editar/ativar-desativar/redefinir senha
+│           ├── page.tsx          # Hub de configurações (links para os submódulos, todos habilitados desde a Fase 4)
+│           ├── usuarios/
+│           │   ├── page.tsx           # Lista de usuários (Server Component, checa role=ADMINISTRADOR)
+│           │   ├── actions.ts         # Server Actions: criarUsuario, atualizarUsuario, alterarStatusUsuario, redefinirSenha
+│           │   ├── NovoUsuarioForm.tsx# Formulário de criação (Client Component, useActionState)
+│           │   └── UsuariosTable.tsx  # Tabela de usuários com ações de editar/ativar-desativar/redefinir senha
+│           ├── loja/
+│           │   ├── page.tsx           # Edição de nome + logo da Loja (Server Component, admin-only)
+│           │   ├── LojaForm.tsx       # Formulário (Client Component, useActionState) com upload de logo
+│           │   └── actions.ts         # Server Action atualizarLoja() — upload em loja-assets/logo via service_role
+│           ├── mensalidades/
+│           │   ├── page.tsx           # Valor vigente + histórico de config_mensalidade (tipo NORMAL)
+│           │   └── actions.ts         # Server Action criarConfigMensalidade() — insert-only (histórico preservado)
+│           ├── remidos/
+│           │   └── page.tsx           # Mesma tela/lógica de mensalidades, filtrada para tipo REMIDO (reusa ConfigMensalidadeForm)
+│           ├── contas/
+│           │   ├── page.tsx           # Lista de contas (Server Component, admin-only)
+│           │   ├── ContasTable.tsx    # Tabela com toggle ativo/inativo (sem delete físico)
+│           │   ├── NovaContaForm.tsx  # Formulário de criação (Client Component, useActionState)
+│           │   └── actions.ts         # Server Actions: criarConta, alterarStatusConta
+│           ├── formas-pagamento/
+│           │   ├── page.tsx                    # Lista de formas de pagamento (Server Component, admin-only)
+│           │   ├── FormasPagamentoTable.tsx     # Tabela com toggle ativo/inativo (sem delete físico)
+│           │   ├── NovaFormaPagamentoForm.tsx   # Formulário de criação (Client Component, useActionState)
+│           │   └── actions.ts                  # Server Actions: criarFormaPagamento, alterarStatusFormaPagamento
+│           └── recibo/
+│               ├── page.tsx           # Edição da assinatura usada nos recibos (Server Component, admin-only)
+│               ├── AssinaturaForm.tsx # Formulário (Client Component, useActionState) com upload de assinatura
+│               └── actions.ts         # Server Action atualizarAssinatura() — upload em loja-assets/assinaturas via service_role
 ├── components/
 │   ├── AcessoNegado.tsx          # Mensagem padrão de "sem permissão" para páginas restritas por role
+│   ├── configuracoes/
+│   │   └── ConfigMensalidadeForm.tsx  # Formulário compartilhado entre /configuracoes/mensalidades e /configuracoes/remidos (Client Component)
 │   └── layout/
 │       ├── Sidebar.tsx           # Navegação lateral fixa (links para os módulos)
 │       └── Header.tsx            # Cabeçalho: nome/role do usuário logado + botão Sair
@@ -57,6 +82,8 @@ Este documento descreve a estrutura de pastas e o fluxo de autenticação implem
 │   │   ├── auth.test.ts          # Testes unitários do mapeamento username→email
 │   │   ├── authorization.ts      # canAccess() — regra pura de decisão de autorização por role
 │   │   ├── authorization.test.ts # Testes unitários de canAccess()
+│   │   ├── configuracoes.ts      # validarLoja(), validarConfigMensalidade(), validarConta(), validarFormaPagamento()
+│   │   ├── configuracoes.test.ts # Testes unitários das validações de Configurações
 │   │   ├── usuarios.ts           # validarNovoUsuario(), validarEdicaoUsuario()
 │   │   └── usuarios.test.ts      # Testes unitários de validação de usuário
 │   └── supabase/
@@ -67,7 +94,9 @@ Este documento descreve a estrutura de pastas e o fluxo de autenticação implem
 ├── proxy.ts                      # Proxy do Next.js (antigo middleware.ts), delega para lib/supabase/middleware.ts
 ├── supabase/
 │   ├── migrations/
-│   │   └── 00000000000001_profiles.sql  # Tabela profiles + RLS + trigger updated_at
+│   │   ├── 00000000000001_profiles.sql  # Tabela profiles + RLS + trigger updated_at
+│   │   ├── ...                          # Migrations 2–15 (Fases 1–2, ver docs/banco.md)
+│   │   └── 00000000000016_loja_assets.sql # Fase 4: loja_config.assinatura_url + bucket de Storage loja-assets
 │   └── seed.sql                  # dados de desenvolvimento (formas de pagamento padrão, config inicial da loja)
 ├── docs/
 │   ├── arquitetura.md            # Este arquivo

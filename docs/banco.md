@@ -84,6 +84,7 @@ As três são `stable`, `security definer` e `set search_path = ''`, seguindo o 
 | `id` | `smallint` | Sim | `1` | PK fixa; `check (id = 1)` garante linha única (padrão "singleton row"). |
 | `nome` | `text` | Sim | — | Nome da Loja. |
 | `logo_url` | `text` | Não | — | URL do logo (Supabase Storage). |
+| `assinatura_url` | `text` | Não | — | URL da imagem de assinatura usada nos recibos (Supabase Storage). Adicionada por `00000000000016_loja_assets.sql` (Fase 4). |
 | `created_at` / `updated_at` | `timestamptz` | Sim | `now()` | Auditoria temporal padrão. |
 
 ### Constraints
@@ -100,6 +101,16 @@ As três são `stable`, `security definer` e `set search_path = ''`, seguindo o 
 ### Triggers
 
 `loja_config_set_updated_at` (BEFORE UPDATE) → `public.set_updated_at()`.
+
+### Storage: bucket `loja-assets` (Fase 4, `00000000000016_loja_assets.sql`)
+
+O logo (`logo_url`) e a assinatura de recibo (`assinatura_url`) de `loja_config` são arquivos armazenados no bucket público `loja-assets` do Supabase Storage, não em `bytea`/base64 no Postgres.
+
+- **`public: true`** — o bucket é de leitura pública (necessário para exibir logo/assinatura na UI e nos recibos em PDF sem exigir sessão autenticada), mas a escrita é restrita:
+  - `loja_assets_select_public` (SELECT em `storage.objects`, sem restrição de role) — qualquer requisição, autenticada ou não, lê qualquer objeto do bucket.
+  - `loja_assets_insert_admin` / `loja_assets_update_admin` (INSERT/UPDATE em `storage.objects`, `authenticated`, `public.is_admin()`) — só Administrador grava/substitui arquivos. Sem policy de DELETE.
+- **Upload nunca acontece diretamente do client.** As Server Actions `atualizarLoja` (`app/(app)/configuracoes/loja/actions.ts`) e `atualizarAssinatura` (`app/(app)/configuracoes/recibo/actions.ts`) chamam `requireAdmin()` e então usam `createSupabaseServiceRoleClient()` (`service_role`, que ignora RLS) para fazer `storage.from('loja-assets').upload(...)` e obter a `publicUrl`. As policies `loja_assets_insert_admin`/`loja_assets_update_admin` acima protegem contra upload via client autenticado normal (chave `anon`); a Server Action é a camada 2 de enforcement (mesmo padrão de `requireAdmin()` + `service_role` já usado em `configuracoes/usuarios`, ver `docs/permissoes.md`).
+- Os arquivos são gravados sob os prefixos `logo/` e `assinaturas/`, com nome `${Date.now()}-${nomeSanitizado}` (sem acentos, apenas `[a-zA-Z0-9.-]`) para evitar colisão e caracteres inválidos na URL pública.
 
 ---
 
@@ -818,6 +829,7 @@ Migrations SQL são versionadas numericamente sob `supabase/migrations/`:
 - `00000000000013_repasses_grande_loja.sql` — `repasses_grande_loja`, `repasses_grande_loja_itens`.
 - `00000000000014_auditoria.sql` — `auditoria`.
 - `00000000000015_fase2_correcoes.sql` — Correções do review final da Fase 2: (1) fecha as policies `for all` de 13 tabelas financeiras/cadastrais que concediam DELETE implícito, substituindo-as por policies separadas de `insert`/`update` sem policy de `delete`; (2) aperta `pagamento_mensalidades.pagamento_id` de `on delete cascade` para `on delete restrict`; (3) corrige `repasses_itens_repasse_status_check` para permitir um item ainda não agrupado em repasse (`repasse_id is null`) ser marcado `CANCELADO`; (4) adiciona `fechamentos_mensais_fechado_auditoria_check` exigindo `fechado_por`/`fechado_em` quando `status = 'FECHADO'`.
+- `00000000000016_loja_assets.sql` — Fase 4: adiciona `loja_config.assinatura_url` e cria o bucket de Storage `loja-assets` (público para leitura, escrita restrita a `is_admin()`), usado por logo e assinatura de recibo.
 
 `supabase/seed.sql` (não numerado, não é migration) contém dados de desenvolvimento: formas de pagamento padrão e a linha singleton de `loja_config`. Não é aplicado automaticamente em produção.
 

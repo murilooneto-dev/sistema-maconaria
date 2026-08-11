@@ -3,12 +3,12 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 const SECOES = [
   { titulo: 'Usuários', href: '/configuracoes/usuarios', apenasAdmin: true },
-  { titulo: 'Loja', href: null },
-  { titulo: 'Mensalidades', href: null },
-  { titulo: 'Remidos', href: null },
-  { titulo: 'Contas', href: null },
-  { titulo: 'Formas de pagamento', href: null },
-  { titulo: 'Recibo', href: null },
+  { titulo: 'Loja', href: '/configuracoes/loja', apenasAdmin: true },
+  { titulo: 'Mensalidades', href: '/configuracoes/mensalidades', apenasAdmin: true },
+  { titulo: 'Remidos', href: '/configuracoes/remidos', apenasAdmin: true },
+  { titulo: 'Contas', href: '/configuracoes/contas', apenasAdmin: true },
+  { titulo: 'Formas de pagamento', href: '/configuracoes/formas-pagamento', apenasAdmin: true },
+  { titulo: 'Recibo', href: '/configuracoes/recibo', apenasAdmin: true },
 ] as const
 
 export default async function ConfiguracoesPage() {

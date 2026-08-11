@@ -13,8 +13,7 @@ O sistema tem três perfis (`profiles.role`, ver `docs/banco.md`): `ADMINISTRADO
 | Área | ADMINISTRADOR | TESOUREIRO | CONSULTA |
 |------|----------------|------------|----------|
 | Membros (cadastro) | Ler e escrever | Somente leitura | Somente leitura |
-| Contas / Formas de pagamento (configuração) | Ler e escrever | Somente leitura | Somente leitura |
-| Configuração da Loja / mensalidade (`loja_config`, `config_mensalidade`) | Ler e escrever | Somente leitura | Somente leitura |
+| Configurações — Loja (nome/logo), Recibo (assinatura), Mensalidades/Remidos (`config_mensalidade`), Contas, Formas de pagamento | Ler e escrever | Somente leitura | Somente leitura |
 | Mensalidades / Pagamentos | Ler e escrever | Ler e escrever | Somente leitura |
 | Campanhas / Doações | Ler e escrever | Ler e escrever | Somente leitura |
 | Movimentações / Transferências | Ler e escrever | Ler e escrever | Somente leitura |
@@ -31,6 +30,7 @@ Notas:
 - **Tesoureiro herda as permissões de leitura/escrita financeira** e é tratado como "no mínimo Tesoureiro" nas policies (`is_tesoureiro()` também é `true` para Administrador — ver `docs/banco.md`, seção "Funções auxiliares de RLS").
 - **Consulta** é somente-leitura em todas as tabelas de domínio que possuem policy de `SELECT` — exceto `auditoria`, exclusiva de Administrador.
 - **Administração de usuários é exclusiva de Administrador** — não existe variante "Tesoureiro cria usuário" ou "Consulta edita usuário" (SPEC §28, "Usuários — CRUD administrativo").
+- **Todas as seis telas de `/configuracoes/*` implementadas na Fase 4** (`loja`, `mensalidades`, `remidos`, `contas`, `formas-pagamento`, `recibo`) seguem o mesmo padrão de `configuracoes/usuarios` (Fase 3): a página (Server Component) revalida `role === 'ADMINISTRADOR'` no servidor antes de renderizar (senão renderiza `AcessoNegado`), e cada Server Action de escrita chama `requireAdmin()` como primeiro passo, antes de tocar o client `service_role`. O hub `app/(app)/configuracoes/page.tsx` também oculta/mostra os links conforme o role, mas isso é só UX — a autorização real está nas duas camadas descritas acima, não no hub.
 
 ---
 
