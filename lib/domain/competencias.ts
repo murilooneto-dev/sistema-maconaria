@@ -16,18 +16,20 @@ export function proximaCompetenciaAposCadastro(dataCadastro: string): Competenci
   return { ano, mes: mes + 1 }
 }
 
+function paraIndice(c: Competencia): number {
+  return c.ano * 12 + (c.mes - 1)
+}
+
+function deIndice(indice: number): Competencia {
+  return { ano: Math.floor(indice / 12), mes: (indice % 12) + 1 }
+}
+
 function competenciaMenorOuIgual(a: Competencia, b: Competencia): boolean {
-  if (a.ano !== b.ano) {
-    return a.ano < b.ano
-  }
-  return a.mes <= b.mes
+  return paraIndice(a) <= paraIndice(b)
 }
 
 function proximaCompetencia(c: Competencia): Competencia {
-  if (c.mes === 12) {
-    return { ano: c.ano + 1, mes: 1 }
-  }
-  return { ano: c.ano, mes: c.mes + 1 }
+  return deIndice(paraIndice(c) + 1)
 }
 
 function chave(c: Competencia): string {
