@@ -1,8 +1,8 @@
-# Arquitetura — Fase 1 (Fundação)
+# Arquitetura
 
 ## Overview
 
-Este documento descreve a estrutura de pastas e o fluxo de autenticação implementados na Fase 1 do sistema. Para o schema do banco de dados e políticas de RLS, ver [`docs/banco.md`](./banco.md).
+Este documento descreve a estrutura de pastas, o fluxo de autenticação e os módulos de negócio implementados nas Fases 1–5 do sistema. Para o schema do banco de dados e políticas de RLS, ver [`docs/banco.md`](./banco.md).
 
 ---
 
@@ -29,7 +29,15 @@ Este documento descreve a estrutura de pastas e o fluxo de autenticação implem
 │   └── (app)/                    # Route group autenticado
 │       ├── layout.tsx            # Verifica sessão, carrega profile, monta Sidebar+Header
 │       ├── dashboard/page.tsx
-│       ├── membros/page.tsx      # Placeholder (Fase 2)
+│       ├── membros/
+│       │   ├── page.tsx               # Lista de membros (Server Component, admin-only) — Fase 5
+│       │   ├── actions.ts             # Server Actions: criarMembro, atualizarMembro — Fase 5
+│       │   ├── novo/
+│       │   │   ├── page.tsx           # Formulário de criação (Server Component) — Fase 5
+│       │   │   └── NovoMembroForm.tsx # Formulário (Client Component, useActionState) — Fase 5
+│       │   └── [id]/
+│       │       ├── page.tsx           # Detalhe de membro (Server Component, admin-only) — Fase 5
+│       │       └── MembroDetalhe.tsx  # Formulário de edição (Client Component, useActionState) — Fase 5
 │       ├── mensalidades/page.tsx # Placeholder (Fase 2)
 │       ├── campanhas/page.tsx    # Placeholder (fase futura)
 │       ├── financeiro/page.tsx   # Placeholder (fase futura)
@@ -85,7 +93,11 @@ Este documento descreve a estrutura de pastas e o fluxo de autenticação implem
 │   │   ├── configuracoes.ts      # validarLoja(), validarConfigMensalidade(), validarConta(), validarFormaPagamento()
 │   │   ├── configuracoes.test.ts # Testes unitários das validações de Configurações
 │   │   ├── usuarios.ts           # validarNovoUsuario(), validarEdicaoUsuario()
-│   │   └── usuarios.test.ts      # Testes unitários de validação de usuário
+│   │   ├── usuarios.test.ts      # Testes unitários de validação de usuário
+│   │   ├── membros.ts            # validarNovoMembro(), validarEdicaoMembro() — Fase 5
+│   │   ├── membros.test.ts       # Testes unitários de validação de membros — Fase 5
+│   │   ├── inadimplencia.ts      # calcularSituacaoMembro() — centraliza regra de 6+ competências vencidas — Fase 5
+│   │   └── inadimplencia.test.ts # Testes unitários de cálculo de inadimplência — Fase 5
 │   └── supabase/
 │       ├── client.ts             # createSupabaseBrowserClient() — uso em Client Components
 │       ├── server.ts             # createSupabaseServerClient() — uso em Server Components/Actions
@@ -165,6 +177,12 @@ Ver `.env.example` na raiz e `docs/instalacao.md` para o passo a passo de config
 
 ---
 
-## Fora de escopo da Fase 1
+## Módulos implementados
 
-Conforme `PROMPT_INICIAL.md` e o self-review do plano da Fase 1: mensalidades, financeiro, campanhas, Grande Loja, recibos e relatórios existem apenas como rotas placeholder na navegação — sem lógica de negócio, sem tabelas de domínio e sem testes. CRUD de usuários e enforcement completo de permissões por perfil ficam para a Fase 3.
+- **Fase 1 (Fundação):** autenticação, profiles, layout autenticado, RLS, Supabase Auth.
+- **Fases 2–4 (Configurações):** loja, usuários, mensalidades, remidos, contas, formas de pagamento, recibo.
+- **Fase 5 (Membros):** CRUD de membros, filtros, cálculo de inadimplência centralizado, validações.
+
+## Fora de escopo
+
+Conforme `PROMPT_INICIAL.md`: mensalidades, financeiro, campanhas, Grande Loja, recibos (geração em PDF) e relatórios existem apenas como rotas placeholder na navegação — sem lógica de negócio em andamento, sem tabelas de domínio e sem testes. Essas funcionalidades são para as fases seguintes.
