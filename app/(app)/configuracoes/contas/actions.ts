@@ -53,6 +53,9 @@ export async function criarConta(
     .single()
 
   if (error || !criada) {
+    if (error?.code === '23505') {
+      return { error: 'Já existe uma conta com esse nome.' }
+    }
     return { error: `Falha ao criar conta: ${error?.message ?? 'erro desconhecido'}` }
   }
 
@@ -63,7 +66,12 @@ export async function criarConta(
       acao: 'CRIACAO_CONTA',
       registroTabela: 'contas',
       registroId: criada.id,
-      dadosNovos: { nome: nome.trim(), descricao, saldoInicial, dataSaldoInicial },
+      dadosNovos: {
+        nome: nome.trim(),
+        descricao: descricao.trim() || null,
+        saldo_inicial: saldoInicial,
+        data_saldo_inicial: dataSaldoInicial,
+      },
       descricao: `Criação da conta ${nome.trim()}`,
     })
   } catch (auditError) {
@@ -119,8 +127,14 @@ export async function atualizarConta(id: string, dados: DadosConta): Promise<{ e
       registroTabela: 'contas',
       registroId: id,
       dadosAnteriores: anterior ?? null,
-      dadosNovos: dados,
-      descricao: `Edição da conta ${id}`,
+      dadosNovos: {
+        nome: dados.nome.trim(),
+        descricao: dados.descricao.trim() || null,
+        saldo_inicial: dados.saldoInicial,
+        data_saldo_inicial: dados.dataSaldoInicial,
+        ativo: dados.ativo,
+      },
+      descricao: `Edição da conta ${dados.nome.trim()}`,
     })
   } catch (auditError) {
     console.error('Falha ao registrar auditoria (conta atualizada com sucesso):', auditError)
