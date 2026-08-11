@@ -94,7 +94,7 @@ Este documento descreve a estrutura de pastas, o fluxo de autenticação e os m�
 │   │   ├── configuracoes.test.ts # Testes unitários das validações de Configurações
 │   │   ├── usuarios.ts           # validarNovoUsuario(), validarEdicaoUsuario()
 │   │   ├── usuarios.test.ts      # Testes unitários de validação de usuário
-│   │   ├── membros.ts            # validarNovoMembro(), validarEdicaoMembro() — Fase 5
+│   │   ├── membros.ts            # validarMembro() — Fase 5
 │   │   ├── membros.test.ts       # Testes unitários de validação de membros — Fase 5
 │   │   ├── inadimplencia.ts      # calcularSituacaoMembro() — centraliza regra de 6+ competências vencidas — Fase 5
 │   │   └── inadimplencia.test.ts # Testes unitários de cálculo de inadimplência — Fase 5
@@ -108,7 +108,10 @@ Este documento descreve a estrutura de pastas, o fluxo de autenticação e os m�
 │   ├── migrations/
 │   │   ├── 00000000000001_profiles.sql  # Tabela profiles + RLS + trigger updated_at
 │   │   ├── ...                          # Migrations 2–15 (Fases 1–2, ver docs/banco.md)
-│   │   └── 00000000000016_loja_assets.sql # Fase 4: loja_config.assinatura_url + bucket de Storage loja-assets
+│   │   ├── 00000000000016_loja_assets.sql # Fase 4: loja_config.assinatura_url + bucket de Storage loja-assets
+│   │   ├── 00000000000017_loja_config_seed.sql # Fase 4 (fix): garante linha singleton de loja_config
+│   │   ├── 00000000000018_assinaturas_privadas.sql # Fase 4 (fix): bucket privado loja-assinaturas
+│   │   └── 00000000000019_config_mensalidade_append_only.sql # Fase 4 (fix): trigger que bloqueia UPDATE/DELETE em config_mensalidade
 │   └── seed.sql                  # dados de desenvolvimento (formas de pagamento padrão, config inicial da loja)
 ├── docs/
 │   ├── arquitetura.md            # Este arquivo
