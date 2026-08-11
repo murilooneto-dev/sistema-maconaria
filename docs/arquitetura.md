@@ -30,14 +30,14 @@ Este documento descreve a estrutura de pastas, o fluxo de autenticação e os m�
 │       ├── layout.tsx            # Verifica sessão, carrega profile, monta Sidebar+Header
 │       ├── dashboard/page.tsx
 │       ├── membros/
-│       │   ├── page.tsx               # Lista de membros (Server Component, admin-only) — Fase 5
-│       │   ├── actions.ts             # Server Actions: criarMembro, atualizarMembro — Fase 5
+│       │   ├── page.tsx               # Lista de membros com filtros (Server Component, leitura liberada a todo autenticado) — Fase 5
+│       │   ├── actions.ts             # Server Actions: criarMembro, atualizarMembro (admin-only via requireAdmin) — Fase 5
 │       │   ├── novo/
-│       │   │   ├── page.tsx           # Formulário de criação (Server Component) — Fase 5
+│       │   │   ├── page.tsx           # Formulário de criação (Server Component, admin-only) — Fase 5
 │       │   │   └── NovoMembroForm.tsx # Formulário (Client Component, useActionState) — Fase 5
 │       │   └── [id]/
-│       │       ├── page.tsx           # Detalhe de membro (Server Component, admin-only) — Fase 5
-│       │       └── MembroDetalhe.tsx  # Formulário de edição (Client Component, useActionState) — Fase 5
+│       │       ├── page.tsx           # Detalhe de membro (Server Component, leitura liberada a todo autenticado; botão Editar só para admin) — Fase 5
+│       │       └── MembroDetalhe.tsx  # Detalhe + edição inline (Client Component, useState/useTransition) — Fase 5
 │       ├── mensalidades/page.tsx # Placeholder (Fase 2)
 │       ├── campanhas/page.tsx    # Placeholder (fase futura)
 │       ├── financeiro/page.tsx   # Placeholder (fase futura)
