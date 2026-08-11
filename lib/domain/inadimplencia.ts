@@ -8,3 +8,28 @@
 export function calcularSituacaoMembro(competenciasVencidasNaoPagas: number): 'ATIVO' | 'INATIVO' {
   return competenciasVencidasNaoPagas > 6 ? 'INATIVO' : 'ATIVO'
 }
+
+export type CompetenciaSituacao = { ano: number; mes: number }
+
+/** Vencida = competência de um mês/ano anterior ao mês/ano atual. */
+export function competenciaVencida(competencia: CompetenciaSituacao, hoje: CompetenciaSituacao): boolean {
+  if (competencia.ano !== hoje.ano) {
+    return competencia.ano < hoje.ano
+  }
+  return competencia.mes < hoje.mes
+}
+
+/**
+ * Conta competências PENDENTE ou PARCIAL cuja data já passou. CANCELADA e
+ * NAO_APLICAVEL nunca contam (decisão registrada na Fase 1). Membros
+ * remidos contam normalmente — não há exceção (decisão confirmada com o
+ * usuário em 2026-08-11).
+ */
+export function contarCompetenciasVencidasNaoPagas(
+  mensalidades: { ano: number; mes: number; status: string }[],
+  hoje: CompetenciaSituacao
+): number {
+  return mensalidades.filter(
+    (m) => (m.status === 'PENDENTE' || m.status === 'PARCIAL') && competenciaVencida(m, hoje)
+  ).length
+}
