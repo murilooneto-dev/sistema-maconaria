@@ -30,6 +30,53 @@ function arredondarCentavos(valor: number): number {
   return Math.round(valor * 100) / 100
 }
 
+type AlocacaoAplicada = {
+  mensalidadeId: string
+  valorAplicado: number
+  valorDevidoAntes: number
+  valorPagoAntes: number
+}
+
+/**
+ * Compensa uma falha no meio do loop de aplicação de alocações em
+ * `registrarPagamento`: reverte cada mensalidade já aplicada com sucesso
+ * de volta ao valor_pago/status anteriores e cancela automaticamente o
+ * pagamento (que já tem vínculos parciais e valor_total inflado). Corrige
+ * C2 da revisão da Tarefa 5 — sem isso, uma falha parcial deixava um
+ * pagamento ATIVO órfão, com valor_total cobrindo alocações que nunca
+ * foram de fato aplicadas.
+ */
+async function compensarFalhaParcial(
+  supabaseAdmin: ReturnType<typeof createSupabaseServiceRoleClient>,
+  pagamentoId: string,
+  aplicadas: AlocacaoAplicada[],
+  usuarioId: string
+): Promise<void> {
+  for (const item of aplicadas) {
+    const novoValorPago = arredondarCentavos(item.valorPagoAntes)
+    const novoStatus =
+      novoValorPago === 0
+        ? 'PENDENTE'
+        : calcularNovoStatusMensalidade(arredondarCentavos(item.valorDevidoAntes), novoValorPago)
+    const payload: Record<string, unknown> = { valor_pago: novoValorPago, status: novoStatus }
+    if (novoStatus !== 'QUITADA') {
+      payload.data_quitacao = null
+    }
+    await supabaseAdmin.from('mensalidades').update(payload).eq('id', item.mensalidadeId)
+  }
+
+  await supabaseAdmin
+    .from('pagamentos')
+    .update({
+      status: 'CANCELADO',
+      motivo_cancelamento: 'Cancelado automaticamente: falha ao registrar todas as competências selecionadas.',
+      cancelado_por: usuarioId,
+      cancelado_em: new Date().toISOString(),
+    })
+    .eq('id', pagamentoId)
+    .eq('status', 'ATIVO')
+}
+
 export async function registrarPagamento(
   _prevState: ActionState,
   formData: FormData
@@ -51,13 +98,21 @@ export async function registrarPagamento(
     return { error: 'Preencha membro, data, conta e forma de pagamento.' }
   }
 
+  // I3: deduplica por mensalidadeId — dois campos pro mesmo id (ex.: form
+  // manipulado) passariam individualmente na validação de saldo mas juntos
+  // poderiam exceder o saldo real da competência. Agrega antes de validar.
   const mensalidadeIds = formData.getAll('mensalidadeId').map(String)
-  const alocacoes: AlocacaoCompetencia[] = mensalidadeIds
-    .filter((id) => formData.get(`selecionada_${id}`) === 'on')
-    .map((id) => ({
-      mensalidadeId: id,
-      valorAplicado: arredondarCentavos(Number(formData.get(`valorAplicado_${id}`))),
-    }))
+  const alocacoesPorId = new Map<string, number>()
+  for (const id of mensalidadeIds) {
+    if (formData.get(`selecionada_${id}`) !== 'on') {
+      continue
+    }
+    const valor = arredondarCentavos(Number(formData.get(`valorAplicado_${id}`)))
+    alocacoesPorId.set(id, arredondarCentavos((alocacoesPorId.get(id) ?? 0) + valor))
+  }
+  const alocacoes: AlocacaoCompetencia[] = Array.from(alocacoesPorId.entries()).map(
+    ([mensalidadeId, valorAplicado]) => ({ mensalidadeId, valorAplicado })
+  )
 
   const supabaseAdmin = createSupabaseServiceRoleClient()
 
@@ -65,9 +120,15 @@ export async function registrarPagamento(
     return { error: 'Selecione ao menos uma competência.' }
   }
 
+  // I1 + I2: restringe a busca ao membro informado e a competências ainda
+  // em aberto — sem isso um POST manipulado poderia aplicar pagamento em
+  // competências de outro membro, ou "ressuscitar" uma competência
+  // CANCELADA/NAO_APLICAVEL que ainda tenha saldo > 0.
   const { data: mensalidades, error: mensalidadesError } = await supabaseAdmin
     .from('mensalidades')
     .select('id, valor_devido, valor_pago, saldo')
+    .eq('membro_id', membroId)
+    .in('status', ['PENDENTE', 'PARCIAL'])
     .in(
       'id',
       alocacoes.map((a) => a.mensalidadeId)
@@ -109,6 +170,8 @@ export async function registrarPagamento(
     }
   }
 
+  const aplicadasComSucesso: AlocacaoAplicada[] = []
+
   for (const alocacao of alocacoes) {
     const mensalidade = mensalidades.find((m) => m.id === alocacao.mensalidadeId)
     if (!mensalidade) {
@@ -122,18 +185,23 @@ export async function registrarPagamento(
     })
 
     if (linkError) {
-      return { error: `Falha ao vincular competência ao pagamento: ${linkError.message}` }
+      // C2: desfaz o que já foi aplicado e cancela o pagamento órfão.
+      await compensarFalhaParcial(supabaseAdmin, pagamento.id, aplicadasComSucesso, usuario.id)
+      return {
+        error: `Falha ao vincular competência ao pagamento: ${linkError.message}. O pagamento foi cancelado automaticamente.`,
+      }
     }
 
-    const novoValorPago = arredondarCentavos(
-      arredondarCentavos(mensalidade.valor_pago) + alocacao.valorAplicado
-    )
-    const novoStatus = calcularNovoStatusMensalidade(
-      arredondarCentavos(mensalidade.valor_devido),
-      novoValorPago
-    )
+    const valorPagoAntes = arredondarCentavos(mensalidade.valor_pago)
+    const valorDevidoAntes = arredondarCentavos(mensalidade.valor_devido)
+    const novoValorPago = arredondarCentavos(valorPagoAntes + alocacao.valorAplicado)
+    const novoStatus = calcularNovoStatusMensalidade(valorDevidoAntes, novoValorPago)
 
-    const { error: updateError } = await supabaseAdmin
+    // C3: lock otimista — só aplica o update se valor_pago não mudou desde
+    // a leitura. Sem isso, dois pagamentos concorrentes na mesma
+    // competência poderiam ambos ler valor_pago=0, ambos passar na
+    // validação de saldo e ambos escrever, duplicando o valor aplicado.
+    const { data: atualizada, error: updateError } = await supabaseAdmin
       .from('mensalidades')
       .update({
         valor_pago: novoValorPago,
@@ -141,10 +209,25 @@ export async function registrarPagamento(
         data_quitacao: novoStatus === 'QUITADA' ? new Date().toISOString() : null,
       })
       .eq('id', alocacao.mensalidadeId)
+      .eq('valor_pago', mensalidade.valor_pago)
+      .select('id')
+      .single()
 
-    if (updateError) {
-      return { error: `Falha ao atualizar competência: ${updateError.message}` }
+    if (updateError || !atualizada) {
+      await compensarFalhaParcial(supabaseAdmin, pagamento.id, aplicadasComSucesso, usuario.id)
+      return {
+        error: updateError
+          ? `Falha ao atualizar competência: ${updateError.message}. O pagamento foi cancelado automaticamente.`
+          : 'Uma das competências selecionadas foi alterada por outra operação simultânea. Tente novamente.',
+      }
     }
+
+    aplicadasComSucesso.push({
+      mensalidadeId: alocacao.mensalidadeId,
+      valorAplicado: alocacao.valorAplicado,
+      valorDevidoAntes,
+      valorPagoAntes,
+    })
   }
 
   await recalcularSituacaoMembro(supabaseAdmin, membroId)
@@ -197,6 +280,28 @@ export async function cancelarPagamento(pagamentoId: string, motivo: string): Pr
     return { error: 'Este pagamento já está cancelado.' }
   }
 
+  // C1: reivindica o cancelamento atomicamente ANTES de reverter qualquer
+  // vínculo. Um UPDATE condicional (`.eq('status', 'ATIVO')`) garante que,
+  // se o operador tentar cancelar de novo após uma falha no meio da
+  // reversão, a segunda tentativa não encontre linha ATIVO pra reivindicar
+  // e pare aqui — em vez de reverter os mesmos vínculos duas vezes.
+  const { data: reivindicado, error: reivindicarError } = await supabaseAdmin
+    .from('pagamentos')
+    .update({
+      status: 'CANCELADO',
+      motivo_cancelamento: motivo.trim(),
+      cancelado_por: usuario.id,
+      cancelado_em: new Date().toISOString(),
+    })
+    .eq('id', pagamentoId)
+    .eq('status', 'ATIVO')
+    .select('id')
+    .single()
+
+  if (reivindicarError || !reivindicado) {
+    return { error: 'Este pagamento já foi cancelado ou não foi encontrado.' }
+  }
+
   const { data: vinculos, error: vinculosError } = await supabaseAdmin
     .from('pagamento_mensalidades')
     .select('mensalidade_id, valor_aplicado')
@@ -208,15 +313,24 @@ export async function cancelarPagamento(pagamentoId: string, motivo: string): Pr
     }
   }
 
+  // I4: snapshot do estado anterior de cada mensalidade, pra auditoria
+  // registrar dadosAnteriores (não só o motivo do cancelamento).
+  const estadoAnterior: Record<string, { valor_pago: number; status: string }> = {}
+
   for (const vinculo of vinculos) {
     const { data: mensalidade } = await supabaseAdmin
       .from('mensalidades')
-      .select('valor_devido, valor_pago')
+      .select('valor_devido, valor_pago, status')
       .eq('id', vinculo.mensalidade_id)
       .single()
 
     if (!mensalidade) {
       continue
+    }
+
+    estadoAnterior[vinculo.mensalidade_id] = {
+      valor_pago: mensalidade.valor_pago,
+      status: mensalidade.status,
     }
 
     const valorAplicado = arredondarCentavos(vinculo.valor_aplicado)
@@ -244,20 +358,6 @@ export async function cancelarPagamento(pagamentoId: string, motivo: string): Pr
     }
   }
 
-  const { error: cancelError } = await supabaseAdmin
-    .from('pagamentos')
-    .update({
-      status: 'CANCELADO',
-      motivo_cancelamento: motivo.trim(),
-      cancelado_por: usuario.id,
-      cancelado_em: new Date().toISOString(),
-    })
-    .eq('id', pagamentoId)
-
-  if (cancelError) {
-    return { error: `Falha ao cancelar pagamento: ${cancelError.message}` }
-  }
-
   await recalcularSituacaoMembro(supabaseAdmin, pagamento.membro_id)
 
   try {
@@ -267,6 +367,7 @@ export async function cancelarPagamento(pagamentoId: string, motivo: string): Pr
       acao: 'CANCELAMENTO_PAGAMENTO',
       registroTabela: 'pagamentos',
       registroId: pagamentoId,
+      dadosAnteriores: { mensalidades: estadoAnterior },
       dadosNovos: { motivo: motivo.trim() },
       descricao: `Cancelamento do pagamento ${pagamentoId}`,
     })
