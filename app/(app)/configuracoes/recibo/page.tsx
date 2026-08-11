@@ -32,10 +32,18 @@ export default async function ReciboConfigPage() {
     )
   }
 
+  let assinaturaUrlAssinada: string | null = null
+  if (lojaConfig?.assinatura_url) {
+    const { data: signedUrlData } = await supabase.storage
+      .from('loja-assinaturas')
+      .createSignedUrl(lojaConfig.assinatura_url, 60 * 5) // 5 minutos, só para a prévia nesta tela
+    assinaturaUrlAssinada = signedUrlData?.signedUrl ?? null
+  }
+
   return (
     <div className="space-y-6">
       <h1 className="text-lg font-semibold text-slate-900">Configurações — Recibo</h1>
-      <AssinaturaForm assinaturaUrl={lojaConfig?.assinatura_url ?? null} />
+      <AssinaturaForm assinaturaUrl={assinaturaUrlAssinada} />
     </div>
   )
 }

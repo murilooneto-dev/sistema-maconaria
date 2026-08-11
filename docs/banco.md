@@ -84,7 +84,7 @@ As três são `stable`, `security definer` e `set search_path = ''`, seguindo o 
 | `id` | `smallint` | Sim | `1` | PK fixa; `check (id = 1)` garante linha única (padrão "singleton row"). |
 | `nome` | `text` | Sim | — | Nome da Loja. |
 | `logo_url` | `text` | Não | — | URL do logo (Supabase Storage). |
-| `assinatura_url` | `text` | Não | — | URL da imagem de assinatura usada nos recibos (Supabase Storage). Adicionada por `00000000000016_loja_assets.sql` (Fase 4). |
+| `assinatura_url` | `text` | Não | — | Caminho (path) do objeto no bucket privado `loja-assinaturas` do Supabase Storage — não é mais uma URL pública desde `00000000000018_assinaturas_privadas.sql`. Coluna adicionada por `00000000000016_loja_assets.sql` (Fase 4). |
 | `created_at` / `updated_at` | `timestamptz` | Sim | `now()` | Auditoria temporal padrão. |
 
 ### Constraints
@@ -104,13 +104,23 @@ As três são `stable`, `security definer` e `set search_path = ''`, seguindo o 
 
 ### Storage: bucket `loja-assets` (Fase 4, `00000000000016_loja_assets.sql`)
 
-O logo (`logo_url`) e a assinatura de recibo (`assinatura_url`) de `loja_config` são arquivos armazenados no bucket público `loja-assets` do Supabase Storage, não em `bytea`/base64 no Postgres.
+O logo (`logo_url`) de `loja_config` é um arquivo armazenado no bucket público `loja-assets` do Supabase Storage, não em `bytea`/base64 no Postgres.
 
-- **`public: true`** — o bucket é de leitura pública (necessário para exibir logo/assinatura na UI e nos recibos em PDF sem exigir sessão autenticada), mas a escrita é restrita:
+- **`public: true`** — o bucket é de leitura pública (necessário para exibir o logo na UI e nos recibos em PDF sem exigir sessão autenticada), mas a escrita é restrita:
   - `loja_assets_select_public` (SELECT em `storage.objects`, sem restrição de role) — qualquer requisição, autenticada ou não, lê qualquer objeto do bucket.
   - `loja_assets_insert_admin` / `loja_assets_update_admin` (INSERT/UPDATE em `storage.objects`, `authenticated`, `public.is_admin()`) — só Administrador grava/substitui arquivos. Sem policy de DELETE.
-- **Upload nunca acontece diretamente do client.** As Server Actions `atualizarLoja` (`app/(app)/configuracoes/loja/actions.ts`) e `atualizarAssinatura` (`app/(app)/configuracoes/recibo/actions.ts`) chamam `requireAdmin()` e então usam `createSupabaseServiceRoleClient()` (`service_role`, que ignora RLS) para fazer `storage.from('loja-assets').upload(...)` e obter a `publicUrl`. As policies `loja_assets_insert_admin`/`loja_assets_update_admin` acima protegem contra upload via client autenticado normal (chave `anon`); a Server Action é a camada 2 de enforcement (mesmo padrão de `requireAdmin()` + `service_role` já usado em `configuracoes/usuarios`, ver `docs/permissoes.md`).
-- Os arquivos são gravados sob os prefixos `logo/` e `assinaturas/`, com nome `${Date.now()}-${nomeSanitizado}` (sem acentos, apenas `[a-zA-Z0-9.-]`) para evitar colisão e caracteres inválidos na URL pública.
+  - `00000000000017_loja_config_seed.sql` (Fase 4, revisão) adiciona `file_size_limit`/`allowed_mime_types` (5MB, apenas imagens) ao bucket, que originalmente não tinha nenhum limite server-side.
+- **Upload nunca acontece diretamente do client.** A Server Action `atualizarLoja` (`app/(app)/configuracoes/loja/actions.ts`) chama `requireAdmin()` e então usa `createSupabaseServiceRoleClient()` (`service_role`, que ignora RLS) para fazer `storage.from('loja-assets').upload(...)` e obter a `publicUrl`. As policies `loja_assets_insert_admin`/`loja_assets_update_admin` acima protegem contra upload via client autenticado normal (chave `anon`); a Server Action é a camada 2 de enforcement (mesmo padrão de `requireAdmin()` + `service_role` já usado em `configuracoes/usuarios`, ver `docs/permissoes.md`).
+- Os arquivos são gravados sob o prefixo `logo/`, com nome `${Date.now()}-${nomeSanitizado}` (sem acentos, apenas `[a-zA-Z0-9.-]`) para evitar colisão e caracteres inválidos na URL pública.
+
+### Storage: bucket `loja-assinaturas` (Fase 4, revisão, `00000000000018_assinaturas_privadas.sql`)
+
+A assinatura de recibo (`assinatura_url` em `loja_config`, que a partir desta revisão guarda o **caminho do objeto no Storage**, não mais uma URL pública) é armazenada em um bucket **privado** separado (`loja-assinaturas`, `public: false`), diferente de `loja-assets`. Motivo: a assinatura autentica documentos financeiros (recibos) e não deve ser legível por qualquer visitante não autenticado — diferente do logo, que é genuinamente público.
+
+- `loja_assinaturas_select_authenticated` (SELECT em `storage.objects`, `authenticated`, sem restrição de admin) — qualquer usuário logado pode gerar uma signed URL para a assinatura (necessário para a prévia em `configuracoes/recibo` e, futuramente, para a geração de PDF na Fase 10).
+- `loja_assinaturas_insert_admin` / `loja_assinaturas_update_admin` (INSERT/UPDATE, `authenticated`, `public.is_admin()`) — só Administrador grava/substitui.
+- `file_size_limit`/`allowed_mime_types` (5MB, apenas imagens) aplicados desde a criação do bucket.
+- A Server Action `atualizarAssinatura` (`app/(app)/configuracoes/recibo/actions.ts`) faz upload via `service_role` e grava apenas o **path** (`assinaturas/${Date.now()}-${nomeSanitizado}`) em `loja_config.assinatura_url`. Como o bucket é privado, `getPublicUrl` não funciona mais; `app/(app)/configuracoes/recibo/page.tsx` gera uma signed URL (`createSignedUrl`, validade de 5 minutos) sob demanda, só para exibir a prévia na tela — usando o client normal (não `service_role`), pois a policy de SELECT já libera para qualquer `authenticated`.
 
 ---
 
@@ -829,7 +839,10 @@ Migrations SQL são versionadas numericamente sob `supabase/migrations/`:
 - `00000000000013_repasses_grande_loja.sql` — `repasses_grande_loja`, `repasses_grande_loja_itens`.
 - `00000000000014_auditoria.sql` — `auditoria`.
 - `00000000000015_fase2_correcoes.sql` — Correções do review final da Fase 2: (1) fecha as policies `for all` de 13 tabelas financeiras/cadastrais que concediam DELETE implícito, substituindo-as por policies separadas de `insert`/`update` sem policy de `delete`; (2) aperta `pagamento_mensalidades.pagamento_id` de `on delete cascade` para `on delete restrict`; (3) corrige `repasses_itens_repasse_status_check` para permitir um item ainda não agrupado em repasse (`repasse_id is null`) ser marcado `CANCELADO`; (4) adiciona `fechamentos_mensais_fechado_auditoria_check` exigindo `fechado_por`/`fechado_em` quando `status = 'FECHADO'`.
-- `00000000000016_loja_assets.sql` — Fase 4: adiciona `loja_config.assinatura_url` e cria o bucket de Storage `loja-assets` (público para leitura, escrita restrita a `is_admin()`), usado por logo e assinatura de recibo.
+- `00000000000016_loja_assets.sql` — Fase 4: adiciona `loja_config.assinatura_url` e cria o bucket de Storage `loja-assets` (público para leitura, escrita restrita a `is_admin()`), usado originalmente por logo e assinatura de recibo.
+- `00000000000017_loja_config_seed.sql` — Fase 4, revisão do review final: garante via `insert ... on conflict do nothing` que a linha singleton `loja_config(id=1)` sempre existe (o seed com esses dados é dev-only, não aplicado em produção); também aplica `file_size_limit`/`allowed_mime_types` ao bucket `loja-assets`.
+- `00000000000018_assinaturas_privadas.sql` — Fase 4, revisão: cria o bucket privado `loja-assinaturas` (`public: false`) para a assinatura de recibo, que passa a não usar mais `loja-assets` (correção de vazamento — a assinatura autentica documentos financeiros e não deveria ser publicamente legível como o logo).
+- `00000000000019_config_mensalidade_append_only.sql` — Fase 4, revisão: adiciona triggers `BEFORE UPDATE`/`BEFORE DELETE` em `config_mensalidade` que sempre lançam exceção, garantindo o append-only mesmo para escritas via `service_role` (que ignora RLS).
 
 `supabase/seed.sql` (não numerado, não é migration) contém dados de desenvolvimento: formas de pagamento padrão e a linha singleton de `loja_config`. Não é aplicado automaticamente em produção.
 
