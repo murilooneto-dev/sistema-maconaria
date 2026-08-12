@@ -26,9 +26,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const { data: lojaConfig } = await supabaseAdmin.from('loja_config').select('nome, logo_url').eq('id', 1).single()
 
-  const [logo, assinatura] = await Promise.all([
+  const [logo, assinatura, assinaturaTesoureiro] = await Promise.all([
     buscarImagemStorage(supabaseAdmin, 'loja-assets', lojaConfig?.logo_url ?? null),
     buscarImagemStorage(supabaseAdmin, 'loja-assinaturas', recibo.assinatura_url),
+    buscarImagemStorage(supabaseAdmin, 'loja-assinaturas', recibo.assinatura_tesoureiro_url),
   ])
 
   const pdfBytes = await gerarPdfRecibo({
@@ -42,6 +43,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     lojaNome: lojaConfig?.nome ?? 'Loja Maçônica',
     logo,
     assinatura,
+    assinaturaTesoureiro,
   })
 
   return new NextResponse(Buffer.from(pdfBytes), {

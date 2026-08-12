@@ -14,13 +14,16 @@ function mensagemAutorizacao(err: unknown): string {
 function sanitizarNomeArquivo(nome: string): string {
   return nome
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // remove acentos
+    .replace(/[̀-ͯ]/g, '') // remove acentos
     .replace(/[^a-zA-Z0-9.-]/g, '_') // troca qualquer coisa que não seja letra/número/ponto/hífen por _
 }
 
-export async function atualizarAssinatura(
-  _prevState: ActionState,
-  formData: FormData
+async function atualizarAssinaturaGenerica(
+  formData: FormData,
+  coluna: 'assinatura_url' | 'assinatura_tesoureiro_url',
+  pastaStorage: string,
+  acaoAuditoria: string,
+  descricaoAuditoria: string
 ): Promise<ActionState> {
   let admin
   try {
@@ -35,7 +38,7 @@ export async function atualizarAssinatura(
   }
 
   const supabaseAdmin = createSupabaseServiceRoleClient()
-  const path = `assinaturas/${Date.now()}-${sanitizarNomeArquivo(assinatura.name)}`
+  const path = `${pastaStorage}/${Date.now()}-${sanitizarNomeArquivo(assinatura.name)}`
 
   const { error: uploadError } = await supabaseAdmin.storage
     .from('loja-assinaturas')
@@ -45,15 +48,11 @@ export async function atualizarAssinatura(
     return { error: `Falha ao enviar assinatura: ${uploadError.message}` }
   }
 
-  const { data: anterior } = await supabaseAdmin
-    .from('loja_config')
-    .select('assinatura_url')
-    .eq('id', 1)
-    .single()
+  const { data: anterior } = await supabaseAdmin.from('loja_config').select(coluna).eq('id', 1).single()
 
   const { data: atualizado, error } = await supabaseAdmin
     .from('loja_config')
-    .update({ assinatura_url: path })
+    .update({ [coluna]: path })
     .eq('id', 1)
     .select('id')
     .single()
@@ -70,11 +69,11 @@ export async function atualizarAssinatura(
     await registrarAuditoria({
       usuarioId: admin.id,
       modulo: 'configuracoes',
-      acao: 'EDICAO_ASSINATURA_RECIBO',
+      acao: acaoAuditoria,
       registroTabela: 'loja_config',
       dadosAnteriores: anterior ?? null,
-      dadosNovos: { assinatura_url: path },
-      descricao: 'Atualização da assinatura usada nos recibos',
+      dadosNovos: { [coluna]: path },
+      descricao: descricaoAuditoria,
     })
   } catch (auditError) {
     console.error('Falha ao registrar auditoria (assinatura atualizada com sucesso):', auditError)
@@ -82,4 +81,27 @@ export async function atualizarAssinatura(
 
   revalidatePath('/configuracoes/recibo')
   return { success: 'Assinatura atualizada com sucesso.' }
+}
+
+export async function atualizarAssinatura(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  return atualizarAssinaturaGenerica(
+    formData,
+    'assinatura_url',
+    'assinaturas',
+    'EDICAO_ASSINATURA_RECIBO',
+    'Atualização da assinatura do Venerável Mestre usada nos recibos'
+  )
+}
+
+export async function atualizarAssinaturaTesoureiro(
+  _prevState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  return atualizarAssinaturaGenerica(
+    formData,
+    'assinatura_tesoureiro_url',
+    'assinaturas-tesoureiro',
+    'EDICAO_ASSINATURA_TESOUREIRO_RECIBO',
+    'Atualização da assinatura do Tesoureiro usada nos recibos'
+  )
 }

@@ -20,7 +20,7 @@ export default async function ReciboConfigPage() {
 
   const { data: lojaConfig, error } = await supabase
     .from('loja_config')
-    .select('assinatura_url')
+    .select('assinatura_url, assinatura_tesoureiro_url')
     .eq('id', 1)
     .single()
 
@@ -32,18 +32,37 @@ export default async function ReciboConfigPage() {
     )
   }
 
-  let assinaturaUrlAssinada: string | null = null
-  if (lojaConfig?.assinatura_url) {
-    const { data: signedUrlData } = await supabase.storage
-      .from('loja-assinaturas')
-      .createSignedUrl(lojaConfig.assinatura_url, 60 * 5) // 5 minutos, só para a prévia nesta tela
-    assinaturaUrlAssinada = signedUrlData?.signedUrl ?? null
+  async function assinarUrl(path: string | null) {
+    if (!path) return null
+    const { data } = await supabase.storage.from('loja-assinaturas').createSignedUrl(path, 60 * 5)
+    return data?.signedUrl ?? null
   }
+
+  const [assinaturaVeneravelUrl, assinaturaTesoureiroUrl] = await Promise.all([
+    assinarUrl(lojaConfig?.assinatura_url ?? null),
+    assinarUrl(lojaConfig?.assinatura_tesoureiro_url ?? null),
+  ])
 
   return (
     <div className="space-y-6">
       <h1 className="text-lg font-semibold text-slate-900">Configurações — Recibo</h1>
-      <AssinaturaForm assinaturaUrl={assinaturaUrlAssinada} />
+      <p className="text-sm text-slate-500">
+        O recibo em PDF exibe as duas assinaturas lado a lado: Venerável Mestre à esquerda, Tesoureiro à direita.
+      </p>
+      <div className="grid gap-6 sm:grid-cols-2">
+        <AssinaturaForm
+          titulo="Assinatura do Venerável Mestre"
+          cargo="Venerável Mestre"
+          assinaturaUrl={assinaturaVeneravelUrl}
+          tesoureiro={false}
+        />
+        <AssinaturaForm
+          titulo="Assinatura do Tesoureiro"
+          cargo="Tesoureiro"
+          assinaturaUrl={assinaturaTesoureiroUrl}
+          tesoureiro
+        />
+      </div>
     </div>
   )
 }

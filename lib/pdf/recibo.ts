@@ -14,9 +14,11 @@ export type DadosRecibo = {
   lojaNome: string
   logo: ImagemEmbutida | null
   assinatura: ImagemEmbutida | null
+  assinaturaTesoureiro: ImagemEmbutida | null
 }
 
-const CARGO_ASSINATURA = 'Venerável Mestre'
+const CARGO_VENERAVEL_MESTRE = 'Venerável Mestre'
+const CARGO_TESOUREIRO = 'Tesoureiro'
 
 const COR_TEXTO = rgb(0.13, 0.13, 0.15)
 const COR_TEXTO_CLARO = rgb(0.42, 0.42, 0.46)
@@ -145,41 +147,47 @@ export async function gerarPdfRecibo(dados: DadosRecibo): Promise<Uint8Array> {
     y -= 16
   }
 
-  // --- Assinatura ---
+  // --- Assinaturas: Venerável Mestre à esquerda, Tesoureiro à direita ---
   const yAssinatura = Math.min(y - 60, margem + 150)
-  const centroX = margem + larguraUtil / 2
+  const centroEsquerda = margem + larguraUtil * 0.25
+  const centroDireita = margem + larguraUtil * 0.75
 
-  if (dados.assinatura) {
-    try {
-      const assinaturaImg = await embutir(dados.assinatura)
-      desenharImagemProporcional(page, assinaturaImg, centroX, yAssinatura + 55, 200, 55, 'centro')
-    } catch (err) {
-      console.error(`Recibo ${dados.id}: falha ao embutir assinatura:`, err)
+  async function desenharBlocoAssinatura(centroX: number, imagem: ImagemEmbutida | null, cargo: string) {
+    if (imagem) {
+      try {
+        const img = await embutir(imagem)
+        desenharImagemProporcional(page, img, centroX, yAssinatura + 50, 170, 50, 'centro')
+      } catch (err) {
+        console.error(`Recibo ${dados.id}: falha ao embutir assinatura (${cargo}):`, err)
+      }
     }
+
+    const linhaLargura = 190
+    page.drawLine({
+      start: { x: centroX - linhaLargura / 2, y: yAssinatura },
+      end: { x: centroX + linhaLargura / 2, y: yAssinatura },
+      thickness: 1,
+      color: rgb(0.3, 0.3, 0.3),
+    })
+
+    page.drawText(cargo, {
+      x: centroX - fontRegular.widthOfTextAtSize(cargo, 11) / 2,
+      y: yAssinatura - 16,
+      size: 11,
+      font: fontRegular,
+      color: COR_TEXTO,
+    })
+    page.drawText(dados.lojaNome, {
+      x: centroX - fontOblique.widthOfTextAtSize(dados.lojaNome, 9) / 2,
+      y: yAssinatura - 30,
+      size: 9,
+      font: fontOblique,
+      color: COR_TEXTO_CLARO,
+    })
   }
 
-  const linhaLargura = 240
-  page.drawLine({
-    start: { x: centroX - linhaLargura / 2, y: yAssinatura },
-    end: { x: centroX + linhaLargura / 2, y: yAssinatura },
-    thickness: 1,
-    color: rgb(0.3, 0.3, 0.3),
-  })
-
-  page.drawText(CARGO_ASSINATURA, {
-    x: centroX - fontRegular.widthOfTextAtSize(CARGO_ASSINATURA, 11) / 2,
-    y: yAssinatura - 16,
-    size: 11,
-    font: fontRegular,
-    color: COR_TEXTO,
-  })
-  page.drawText(dados.lojaNome, {
-    x: centroX - fontOblique.widthOfTextAtSize(dados.lojaNome, 9) / 2,
-    y: yAssinatura - 30,
-    size: 9,
-    font: fontOblique,
-    color: COR_TEXTO_CLARO,
-  })
+  await desenharBlocoAssinatura(centroEsquerda, dados.assinatura, CARGO_VENERAVEL_MESTRE)
+  await desenharBlocoAssinatura(centroDireita, dados.assinaturaTesoureiro, CARGO_TESOUREIRO)
 
   return pdf.save()
 }
