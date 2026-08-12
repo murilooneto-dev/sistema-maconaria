@@ -66,7 +66,7 @@ export async function salvarConfigMensalidade(
     )
   }
 
-  revalidatePath(tipo === 'NORMAL' ? '/configuracoes/mensalidades' : '/configuracoes/remidos')
+  revalidatePath('/configuracoes/mensalidades')
   return {
     success: 'Nova configuração salva com sucesso. Vale a partir de agora para novas competências.',
   }

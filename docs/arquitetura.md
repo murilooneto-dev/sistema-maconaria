@@ -98,7 +98,7 @@ Este documento descreve a estrutura de pastas, o fluxo de autenticação e os m�
 ├── components/
 │   ├── AcessoNegado.tsx          # Mensagem padrão de "sem permissão" para páginas restritas por role
 │   ├── configuracoes/
-│   │   └── ConfigMensalidadeForm.tsx  # Formulário compartilhado entre /configuracoes/mensalidades e /configuracoes/remidos (Client Component)
+│   │   └── ConfigMensalidadeForm.tsx  # Formulário compartilhado pelas seções Normal e Remidos em /configuracoes/mensalidades (Client Component)
 │   └── layout/
 │       ├── Sidebar.tsx           # Navegação lateral fixa (links para os módulos)
 │       └── Header.tsx            # Cabeçalho: nome/role do usuário logado + botão Sair
