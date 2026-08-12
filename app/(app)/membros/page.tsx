@@ -8,6 +8,7 @@ type SearchParams = {
   do_quadro?: string
   remido?: string
   recolhe?: string
+  em_iniciacao?: string
 }
 
 export default async function MembrosPage({
@@ -30,7 +31,7 @@ export default async function MembrosPage({
 
   let query = supabase
     .from('membros')
-    .select('id, nome, telefone, matricula, do_quadro, remido, recolhe, situacao')
+    .select('id, nome, telefone, matricula, do_quadro, remido, recolhe, em_iniciacao, situacao')
     .order('nome')
 
   if (params.nome) {
@@ -47,6 +48,9 @@ export default async function MembrosPage({
   }
   if (params.recolhe) {
     query = query.eq('recolhe', params.recolhe === 'true')
+  }
+  if (params.em_iniciacao) {
+    query = query.eq('em_iniciacao', params.em_iniciacao === 'true')
   }
 
   const { data: membros, error } = await query
@@ -125,6 +129,15 @@ export default async function MembrosPage({
           <option value="true">Sim</option>
           <option value="false">Não</option>
         </select>
+        <select
+          name="em_iniciacao"
+          defaultValue={params.em_iniciacao ?? ''}
+          className="rounded border border-slate-300 px-3 py-2 text-sm"
+        >
+          <option value="">Em iniciação (todos)</option>
+          <option value="true">Sim</option>
+          <option value="false">Não</option>
+        </select>
         <button
           type="submit"
           className="rounded border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700"
@@ -146,6 +159,7 @@ export default async function MembrosPage({
                 <th className="px-4 py-2 font-medium">Do quadro</th>
                 <th className="px-4 py-2 font-medium">Remido</th>
                 <th className="px-4 py-2 font-medium">Recolhe</th>
+                <th className="px-4 py-2 font-medium">Em iniciação</th>
                 <th className="px-4 py-2 font-medium">Situação</th>
               </tr>
             </thead>
@@ -158,10 +172,11 @@ export default async function MembrosPage({
                     </Link>
                   </td>
                   <td className="px-4 py-2 text-slate-500">{membro.telefone ?? '—'}</td>
-                  <td className="px-4 py-2 text-slate-500">{membro.matricula}</td>
+                  <td className="px-4 py-2 text-slate-500">{membro.matricula ?? '—'}</td>
                   <td className="px-4 py-2">{membro.do_quadro ? 'Sim' : 'Não'}</td>
                   <td className="px-4 py-2">{membro.remido ? 'Sim' : 'Não'}</td>
                   <td className="px-4 py-2">{membro.recolhe ? 'Sim' : 'Não'}</td>
+                  <td className="px-4 py-2">{membro.em_iniciacao ? 'Sim' : 'Não'}</td>
                   <td className="px-4 py-2">
                     <span className={membro.situacao === 'ATIVO' ? 'text-green-700' : 'text-slate-400'}>
                       {membro.situacao}

@@ -7,12 +7,25 @@ import { registrarAuditoria } from '@/lib/audit'
 import { parseCsvMembros } from '@/lib/domain/membros-import'
 import { gerarCompetenciasParaMembro } from '@/lib/mensalidades/gerar-competencias-membro'
 
+// Excel no Brasil costuma salvar CSV em Windows-1252 (ANSI), não UTF-8.
+// File.text() sempre decodifica como UTF-8 e substitui byte inválido por
+// U+FFFD (o "balão com interrogação"), perdendo o caractere original — daí
+// a queda para Windows-1252 quando a decodificação estrita em UTF-8 falha.
+async function lerConteudoCsv(arquivo: File): Promise<string> {
+  const buffer = await arquivo.arrayBuffer()
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(buffer)
+  } catch {
+    return new TextDecoder('windows-1252').decode(buffer)
+  }
+}
+
 export type ResultadoImportacao = {
   error?: string
   resumo?: {
     total: number
     criados: number
-    duplicados: { linha: number; matricula: string }[]
+    duplicados: { linha: number; matricula: string | null }[]
     invalidos: { linha: number; erro: string }[]
     falhas: { linha: number; erro: string }[]
   }
@@ -34,7 +47,7 @@ export async function importarMembros(
     return { error: 'Selecione um arquivo CSV.' }
   }
 
-  const conteudo = await arquivo.text()
+  const conteudo = await lerConteudoCsv(arquivo)
   const { linhas, erroCabecalho } = parseCsvMembros(conteudo)
 
   if (erroCabecalho) {
@@ -47,7 +60,7 @@ export async function importarMembros(
   const supabaseAdmin = createSupabaseServiceRoleClient()
 
   const invalidos = linhas.filter((l) => l.erro).map((l) => ({ linha: l.numeroLinha, erro: l.erro! }))
-  const duplicados: { linha: number; matricula: string }[] = []
+  const duplicados: { linha: number; matricula: string | null }[] = []
   const falhas: { linha: number; erro: string }[] = []
   let criados = 0
 
@@ -63,6 +76,7 @@ export async function importarMembros(
         do_quadro: linha.doQuadro,
         remido: linha.remido,
         recolhe: linha.recolhe,
+        em_iniciacao: linha.emIniciacao,
       })
       .select('id, data_cadastro')
       .single()
