@@ -48,7 +48,12 @@ Este documento descreve a estrutura de pastas, o fluxo de autenticação e os m�
 │       │       ├── SelecionarMembro.tsx    # Client Component: dropdown de membros + cálculo dinâmico de saldos
 │       │       ├── PagamentoForm.tsx       # Client Component: seleção de competências + valores + forma de pagamento + conta
 │       │       └── HistoricoPagamentos.tsx # Client Component: tabela de histórico de pagamentos do membro
-│       ├── campanhas/page.tsx    # Placeholder (fase futura)
+│       ├── campanhas/                 # Módulo Campanhas — Fase 8
+│       │   ├── page.tsx                # Cards (meta/arrecadado/saldo/percentual/status) — Server Component
+│       │   ├── actions.ts              # Server Actions: criarCampanha, atualizarCampanha, concluirCampanha, cancelarCampanha, reabrirCampanha
+│       │   ├── nova/                   # Formulário de criação
+│       │   └── [id]/                   # Detalhe: doações, nova doação (vincula financeiro), cancelar doação, editar, mudar status
+│       │       └── actions.ts          # Server Actions: registrarDoacao(), cancelarDoacao()
 │       ├── financeiro/                # Módulo Financeiro — Fase 7
 │       │   ├── FinanceiroTabs.tsx      # Navegação entre as 4 sub-telas (Client Component)
 │       │   ├── page.tsx                # Movimentações: filtros + tabela + totais (Server Component)
@@ -123,14 +128,18 @@ Este documento descreve a estrutura de pastas, o fluxo de autenticação e os m�
 │   │   ├── competencias.test.ts  # Testes unitários de cálculo de competências — Fase 6
 │   │   ├── pagamentos.ts         # validarAlocacoes(), calcularNovoStatusMensalidade() — SPEC §11–13 — Fase 6
 │   │   ├── pagamentos.test.ts    # Testes unitários de validação de pagamentos — Fase 6
-│   │   └── financeiro.ts         # validarMovimentacao(), validarTransferencia(), calcularSaldoConta(), calcularFechamento(), podeFecharPeriodo(), podeReabrir() — Fase 7
+│   │   ├── financeiro.ts         # validarMovimentacao(), validarTransferencia(), calcularSaldoConta(), calcularFechamento(), podeFecharPeriodo(), podeReabrir() — Fase 7
+│   │   └── campanhas.ts          # validarCampanha(), validarDoacao(), calcularArrecadado(), calcularPercentual(), deveConcluirAutomaticamente() — Fase 8
 │   ├── mensalidades/
 │   │   └── recalcular-situacao.ts # recalcularSituacaoMembro() — centraliza sincronização de situação após pagamento/cancelamento — Fase 6
+│   ├── campanhas/                # Fase 8
+│   │   └── recalcular-status.ts  # recalcularStatusCampanha() — EM_ANDAMENTO → CONCLUIDA automático ao atingir a meta (nunca reabre sozinho)
 │   ├── financeiro/               # Fase 7
-│   │   ├── constantes.ts         # CATEGORIA_MENSALIDADE_ID — UUID fixo da categoria de sistema
+│   │   ├── constantes.ts         # CATEGORIA_MENSALIDADE_ID, CATEGORIA_CAMPANHA_ID — UUIDs fixos das categorias de sistema
 │   │   ├── periodo.ts            # periodoEstaFechado() — checagem de fechamento em código de aplicação (usado por pagamentos, movimentações e transferências)
 │   │   ├── fechamento.ts         # obterUltimoFechado(), obterRegistroPeriodo(), cálculo de saldo inicial/totais de um período
-│   │   └── movimentacao-pagamento.ts # criarMovimentacaoPagamento()/cancelarMovimentacaoPagamento() — vínculo entre pagamento de mensalidade e financeiro
+│   │   ├── movimentacao-pagamento.ts # criarMovimentacaoPagamento()/cancelarMovimentacaoPagamento() — vínculo entre pagamento de mensalidade e financeiro
+│   │   └── movimentacao-doacao.ts    # criarMovimentacaoDoacao()/cancelarMovimentacaoDoacao() — vínculo entre doação e financeiro — Fase 8
 │   └── supabase/
 │       ├── client.ts             # createSupabaseBrowserClient() — uso em Client Components
 │       ├── server.ts             # createSupabaseServerClient() — uso em Server Components/Actions
@@ -145,7 +154,8 @@ Este documento descreve a estrutura de pastas, o fluxo de autenticação e os m�
 │   │   ├── 00000000000017_loja_config_seed.sql # Fase 4 (fix): garante linha singleton de loja_config
 │   │   ├── 00000000000018_assinaturas_privadas.sql # Fase 4 (fix): bucket privado loja-assinaturas
 │   │   ├── 00000000000019_config_mensalidade_append_only.sql # Fase 4 (fix): trigger que bloqueia UPDATE/DELETE em config_mensalidade
-│   │   └── 00000000000020_financeiro_fase7.sql # Fase 7: categorias_movimentacao (+ trigger de categoria de sistema), movimentacoes.categoria → categoria_id, trigger de bloqueio de cancelamento em período fechado
+│   │   ├── 00000000000020_financeiro_fase7.sql # Fase 7: categorias_movimentacao (+ trigger de categoria de sistema), movimentacoes.categoria → categoria_id, trigger de bloqueio de cancelamento em período fechado
+│   │   └── 00000000000021_campanhas_fase8.sql # Fase 8: seed da categoria de sistema "Campanha" (ENTRADA) em categorias_movimentacao
 │   └── seed.sql                  # dados de desenvolvimento (formas de pagamento padrão, config inicial da loja)
 ├── docs/
 │   ├── arquitetura.md            # Este arquivo
@@ -222,6 +232,8 @@ Ver `.env.example` na raiz e `docs/instalacao.md` para o passo a passo de config
 - **Fase 6 (Mensalidades):** geração de competências, registro de pagamento (integral/parcial/múltiplas competências/atrasadas), cancelamento de pagamento, cálculo dinâmico de saldo, recalcular situação de membro (ATIVO/INATIVO), auditoria de pagamentos.
 - **Fase 7 (Financeiro):** categorias de movimentação editáveis (`categorias_movimentacao`, categoria de sistema "Mensalidade" protegida por trigger), lançamentos manuais (Tronco/Recebimentos/Despesas/Custos/Pagamentos avulsos), vínculo automático entre pagamento de mensalidade e movimentação (criado ao registrar, cancelado ao cancelar o pagamento), transferências entre contas, saldo de conta calculado on-the-fly (nunca armazenado), fechamento mensal (saldo inicial encadeado ao fechamento anterior, sequência obrigatória, reabertura só pelo Administrador e só no fechamento mais recente). Cancelamento de movimentação/transferência num período fechado é bloqueado tanto em código quanto por trigger de banco (`bloqueia_cancelamento_periodo_fechado`); para pagamentos de mensalidade a checagem é só em código de aplicação (`periodoEstaFechado`), pra não colidir com o fluxo de compensação automática da Fase 6. **Sem testes automatizados nesta fase** — validação combinada com o usuário para ser manual (decisão registrada em 2026-08-12).
 
-## Fora de escopo (Fase 7)
+- **Fase 8 (Campanhas):** CRUD de campanhas (cards com meta/arrecadado/saldo/percentual/status), registro de doação (membro ou pessoa externa) com vínculo automático ao financeiro (movimentação ENTRADA/Campanha, criada ao registrar e cancelada ao cancelar a doação), conclusão automática ao atingir a meta (`EM_ANDAMENTO → CONCLUIDA`), conclusão/cancelamento/reabertura manuais. **Sem testes automatizados**, mesmo padrão da Fase 7.
 
-Conforme `PROMPT_INICIAL.md`: campanhas, Grande Loja, recibos (geração em PDF) e relatórios existem apenas como rotas placeholder na navegação — sem lógica de negócio em andamento, sem tabelas de domínio e sem testes. Essas funcionalidades são para as fases seguintes. Nota: a criação de itens em `repasses_grande_loja_itens` está deliberadamente fora de escopo (decisão registrada na Fase 2) — será implementada conforme o módulo de Grande Loja evoluir (Fase 9).
+## Fora de escopo (Fase 8)
+
+Conforme `PROMPT_INICIAL.md`: Grande Loja, recibos (geração em PDF) e relatórios existem apenas como rotas placeholder na navegação — sem lógica de negócio em andamento, sem tabelas de domínio e sem testes. Essas funcionalidades são para as fases seguintes. Nota: a criação de itens em `repasses_grande_loja_itens` está deliberadamente fora de escopo (decisão registrada na Fase 2) — será implementada conforme o módulo de Grande Loja evoluir (Fase 9).

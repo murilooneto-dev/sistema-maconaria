@@ -300,6 +300,8 @@ A assinatura de recibo (`assinatura_url` em `loja_config`, que a partir desta re
 
 **Por quê:** SPEC §24 trata campanhas como operação financeira/assistencial corrente, no mesmo grupo de mensalidades/pagamentos — Tesoureiro (que inclui Administrador via `is_tesoureiro()`) gerencia.
 
+**Fase 8:** `status` transiciona `EM_ANDAMENTO → CONCLUIDA` automaticamente quando a soma das doações ativas atinge `meta` (`recalcularStatusCampanha()` em `lib/campanhas/recalcular-status.ts`, chamada após cada doação registrada/cancelada). Nunca reabre sozinho — reabertura é sempre uma ação manual (`reabrirCampanha`). `CANCELADA` também é manual (`cancelarCampanha`), independente de meta.
+
 ### Triggers
 
 `campanhas_set_updated_at` (BEFORE UPDATE) → `public.set_updated_at()`.
@@ -471,6 +473,8 @@ A soma de `pagamento_mensalidades.valor_aplicado` para uma dada `mensalidade_id`
 
 **Por quê:** SPEC §25 — doação é operação financeira corrente ligada a campanhas, mesma trilha de rastreabilidade e cancelamento não-destrutivo de `pagamentos`.
 
+**Fase 8:** cada doação registrada cria automaticamente uma `movimentacoes` (ENTRADA, categoria de sistema "Campanha", `doacao_id` + `campanha_id` preenchidos) — mesmo padrão do vínculo pagamento↔movimentação da Fase 7 (`lib/financeiro/movimentacao-doacao.ts`). Cancelar a doação cancela a movimentação vinculada; se a movimentação falhar ao ser criada, a doação é cancelada automaticamente (compensação, sem deixar doação órfã sem rastro financeiro).
+
 ### Triggers
 
 `doacoes_set_updated_at` (BEFORE UPDATE) → `public.set_updated_at()`.
@@ -498,7 +502,7 @@ A soma de `pagamento_mensalidades.valor_aplicado` para uma dada `mensalidade_id`
 | `membro_id` | `uuid` | Não | — | FK → `membros(id)`, opcional. |
 | `campanha_id` | `uuid` | Não | — | FK → `campanhas(id)`, opcional. |
 | `usuario_id` | `uuid` | Sim | — | FK → `profiles(id)`. |
-| `origem` | `text` | Sim | — | Texto livre identificando a origem do lançamento — não é enum fechado no banco. Valores usados pela aplicação desde a Fase 7: `'MANUAL'` (lançamento manual em `/financeiro/nova`) e `'MENSALIDADE'` (gerado automaticamente ao registrar um pagamento de mensalidade; cancelamento só é permitido via tela de Mensalidades, nunca diretamente em `/financeiro`). |
+| `origem` | `text` | Sim | — | Texto livre identificando a origem do lançamento — não é enum fechado no banco. Valores usados pela aplicação: `'MANUAL'` (lançamento manual em `/financeiro/nova`, Fase 7), `'MENSALIDADE'` (gerado automaticamente ao registrar um pagamento de mensalidade; cancelamento só via tela de Mensalidades, Fase 7) e `'CAMPANHA'` (gerado automaticamente ao registrar uma doação; cancelamento só via tela da campanha, Fase 8). |
 | `pagamento_id` | `uuid` | Não | — | FK → `pagamentos(id)`, preenchida quando a movimentação foi gerada por um pagamento de mensalidade. |
 | `doacao_id` | `uuid` | Não | — | FK → `doacoes(id)`, preenchida quando gerada por uma doação. |
 | `status` | `text` | Sim | `'ATIVO'` | `'ATIVO'` ou `'CANCELADO'` (check). |
@@ -585,7 +589,7 @@ A soma de `pagamento_mensalidades.valor_aplicado` para uma dada `mensalidade_id`
 | `id` | `uuid` | Sim | `gen_random_uuid()` | PK. |
 | `nome` | `text` | Sim | — | — |
 | `tipo` | `text` | Sim | — | `'ENTRADA'` ou `'SAIDA'` (check). |
-| `sistema` | `boolean` | Sim | `false` | `true` só para a categoria "Mensalidade" (seed, UUID fixo `00000000-0000-0000-0000-000000000001`) — usada exclusivamente pelo vínculo automático de pagamento de mensalidade; nunca editável/removível pela UI nem pelo banco (ver Triggers). |
+| `sistema` | `boolean` | Sim | `false` | `true` para as categorias "Mensalidade" (UUID fixo `00000000-0000-0000-0000-000000000001`, Fase 7) e "Campanha" (UUID fixo `00000000-0000-0000-0000-000000000002`, seed de `00000000000021_campanhas_fase8.sql`) — usadas exclusivamente pelos vínculos automáticos de pagamento de mensalidade e doação; nunca editáveis/removíveis pela UI nem pelo banco (ver Triggers). |
 | `ativo` | `boolean` | Sim | `true` | — |
 | `created_at` / `updated_at` | `timestamptz` | Sim | `now()` | — |
 
@@ -879,6 +883,7 @@ Migrations SQL são versionadas numericamente sob `supabase/migrations/`:
 - `00000000000018_assinaturas_privadas.sql` — Fase 4, revisão: cria o bucket privado `loja-assinaturas` (`public: false`) para a assinatura de recibo, que passa a não usar mais `loja-assets` (correção de vazamento — a assinatura autentica documentos financeiros e não deveria ser publicamente legível como o logo).
 - `00000000000019_config_mensalidade_append_only.sql` — Fase 4, revisão: adiciona triggers `BEFORE UPDATE`/`BEFORE DELETE` em `config_mensalidade` que sempre lançam exceção, garantindo o append-only mesmo para escritas via `service_role` (que ignora RLS).
 - `00000000000020_financeiro_fase7.sql` — Fase 7: cria `categorias_movimentacao` (com trigger que protege a categoria de sistema "Mensalidade"), troca `movimentacoes.categoria` (texto livre) por `categoria_id` (FK), e adiciona o trigger `bloqueia_cancelamento_periodo_fechado` em `movimentacoes`/`transferencias`.
+- `00000000000021_campanhas_fase8.sql` — Fase 8: seed da categoria de sistema "Campanha" (ENTRADA) em `categorias_movimentacao`, usada pelo vínculo automático de doação.
 
 `supabase/seed.sql` (não numerado, não é migration) contém dados de desenvolvimento: formas de pagamento padrão e a linha singleton de `loja_config`. Não é aplicado automaticamente em produção.
 
