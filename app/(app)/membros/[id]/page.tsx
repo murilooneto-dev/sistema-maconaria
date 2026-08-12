@@ -23,7 +23,7 @@ export default async function MembroDetalhePage({
 
   const { data: membro, error } = await supabase
     .from('membros')
-    .select('id, nome, telefone, matricula, do_quadro, remido, recolhe, situacao, data_cadastro')
+    .select('id, nome, telefone, matricula, do_quadro, remido, recolhe, em_iniciacao, situacao, data_cadastro')
     .eq('id', id)
     .single()
 

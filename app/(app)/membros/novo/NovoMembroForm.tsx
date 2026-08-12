@@ -23,13 +23,12 @@ export function NovoMembroForm() {
 
       <div className="space-y-1">
         <label htmlFor="matricula" className="text-sm font-medium text-slate-700">
-          Matrícula
+          Matrícula (opcional — deixe em branco se ainda estiver em iniciação)
         </label>
         <input
           id="matricula"
           name="matricula"
           type="text"
-          required
           className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
         />
       </div>
@@ -58,6 +57,10 @@ export function NovoMembroForm() {
         <label className="flex items-center gap-2 text-sm text-slate-700">
           <input type="checkbox" name="recolhe" />
           Recolhe
+        </label>
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input type="checkbox" name="emIniciacao" />
+          Em iniciação
         </label>
       </div>
 

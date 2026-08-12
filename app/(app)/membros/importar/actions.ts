@@ -12,7 +12,7 @@ export type ResultadoImportacao = {
   resumo?: {
     total: number
     criados: number
-    duplicados: { linha: number; matricula: string }[]
+    duplicados: { linha: number; matricula: string | null }[]
     invalidos: { linha: number; erro: string }[]
     falhas: { linha: number; erro: string }[]
   }
@@ -47,7 +47,7 @@ export async function importarMembros(
   const supabaseAdmin = createSupabaseServiceRoleClient()
 
   const invalidos = linhas.filter((l) => l.erro).map((l) => ({ linha: l.numeroLinha, erro: l.erro! }))
-  const duplicados: { linha: number; matricula: string }[] = []
+  const duplicados: { linha: number; matricula: string | null }[] = []
   const falhas: { linha: number; erro: string }[] = []
   let criados = 0
 
@@ -63,6 +63,7 @@ export async function importarMembros(
         do_quadro: linha.doQuadro,
         remido: linha.remido,
         recolhe: linha.recolhe,
+        em_iniciacao: linha.emIniciacao,
       })
       .select('id, data_cadastro')
       .single()

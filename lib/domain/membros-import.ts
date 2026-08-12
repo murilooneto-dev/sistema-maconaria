@@ -3,17 +3,16 @@ import { validarMembro } from './membros'
 export type LinhaCsvMembro = {
   numeroLinha: number
   nome: string
-  matricula: string
+  matricula: string | null
   telefone: string | null
   doQuadro: boolean
   remido: boolean
   recolhe: boolean
+  emIniciacao: boolean
   erro?: string
 }
 
 export type ResultadoParseCsv = { linhas: LinhaCsvMembro[]; erroCabecalho?: string }
-
-const COLUNAS_ESPERADAS = ['nome', 'matricula', 'telefone', 'doquadro', 'remido', 'recolhe']
 
 function normalizarCabecalho(campo: string): string {
   return campo
@@ -38,7 +37,8 @@ function dividirLinhaCsv(linha: string): string[] {
  * Faz o parse de um CSV de membros (separador `;`, com cabeçalho — mesmo
  * padrão de lib/csv.ts) e valida cada linha com validarMembro(). Não toca
  * no banco — a verificação de matrícula duplicada só é possível na Server
- * Action, que tem acesso ao banco.
+ * Action, que tem acesso ao banco. Matrícula é opcional (membros em
+ * iniciação ainda não têm uma).
  */
 export function parseCsvMembros(conteudo: string): ResultadoParseCsv {
   const texto = conteudo.replace(/^﻿/, '').trim()
@@ -52,36 +52,39 @@ export function parseCsvMembros(conteudo: string): ResultadoParseCsv {
   const indice = (coluna: string) => cabecalho.indexOf(coluna)
 
   const idxNome = indice('nome')
-  const idxMatricula = indice('matricula')
 
-  if (idxNome === -1 || idxMatricula === -1) {
+  if (idxNome === -1) {
     return {
       linhas: [],
-      erroCabecalho: `Cabeçalho inválido — as colunas obrigatórias são: ${COLUNAS_ESPERADAS.slice(0, 2).join(', ')}. Colunas opcionais: telefone, doQuadro, remido, recolhe.`,
+      erroCabecalho:
+        'Cabeçalho inválido — a coluna obrigatória é: nome. Colunas opcionais: matricula, telefone, doQuadro, remido, recolhe, emIniciacao.',
     }
   }
 
+  const idxMatricula = indice('matricula')
   const idxTelefone = indice('telefone')
   const idxDoQuadro = indice('doquadro')
   const idxRemido = indice('remido')
   const idxRecolhe = indice('recolhe')
+  const idxEmIniciacao = indice('eminiciacao')
 
   const linhas: LinhaCsvMembro[] = linhasBrutas.slice(1).map((linhaTexto, i) => {
     const campos = dividirLinhaCsv(linhaTexto)
     const nome = campos[idxNome] ?? ''
-    const matricula = campos[idxMatricula] ?? ''
+    const matricula = idxMatricula >= 0 ? campos[idxMatricula] || null : null
     const telefone = idxTelefone >= 0 ? campos[idxTelefone] || null : null
 
-    const validacao = validarMembro({ nome, matricula })
+    const validacao = validarMembro({ nome, matricula: matricula ?? '' })
 
     return {
       numeroLinha: i + 2, // +1 pelo cabeçalho, +1 porque é 1-indexado
       nome: nome.trim(),
-      matricula: matricula.trim(),
+      matricula: matricula?.trim() || null,
       telefone,
       doQuadro: idxDoQuadro >= 0 ? parseBooleano(campos[idxDoQuadro]) : true,
       remido: idxRemido >= 0 ? parseBooleano(campos[idxRemido]) : false,
       recolhe: idxRecolhe >= 0 ? parseBooleano(campos[idxRecolhe]) : false,
+      emIniciacao: idxEmIniciacao >= 0 ? parseBooleano(campos[idxEmIniciacao]) : false,
       erro: validacao.valido ? undefined : validacao.erro,
     }
   })

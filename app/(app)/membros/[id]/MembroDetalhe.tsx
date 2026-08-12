@@ -7,10 +7,11 @@ type Membro = {
   id: string
   nome: string
   telefone: string | null
-  matricula: string
+  matricula: string | null
   do_quadro: boolean
   remido: boolean
   recolhe: boolean
+  em_iniciacao: boolean
   situacao: string
   data_cadastro: string
 }
@@ -19,11 +20,12 @@ export function MembroDetalhe({ membro, isAdmin }: { membro: Membro; isAdmin: bo
   const [editing, setEditing] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [nome, setNome] = useState(membro.nome)
-  const [matricula, setMatricula] = useState(membro.matricula)
+  const [matricula, setMatricula] = useState(membro.matricula ?? '')
   const [telefone, setTelefone] = useState(membro.telefone ?? '')
   const [doQuadro, setDoQuadro] = useState(membro.do_quadro)
   const [remido, setRemido] = useState(membro.remido)
   const [recolhe, setRecolhe] = useState(membro.recolhe)
+  const [emIniciacao, setEmIniciacao] = useState(membro.em_iniciacao)
   const [feedback, setFeedback] = useState<{ message: string; isError: boolean } | null>(null)
 
   function handleSave() {
@@ -35,6 +37,7 @@ export function MembroDetalhe({ membro, isAdmin }: { membro: Membro; isAdmin: bo
         doQuadro,
         remido,
         recolhe,
+        emIniciacao,
       })
       setFeedback({ message: result.error ?? 'Membro atualizado.', isError: Boolean(result.error) })
       if (!result.error) {
@@ -93,6 +96,10 @@ export function MembroDetalhe({ membro, isAdmin }: { membro: Membro; isAdmin: bo
               <input type="checkbox" checked={recolhe} onChange={(e) => setRecolhe(e.target.checked)} />
               Recolhe
             </label>
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input type="checkbox" checked={emIniciacao} onChange={(e) => setEmIniciacao(e.target.checked)} />
+              Em iniciação
+            </label>
           </div>
           <div className="space-x-2">
             <button
@@ -117,7 +124,7 @@ export function MembroDetalhe({ membro, isAdmin }: { membro: Membro; isAdmin: bo
           <dl className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <dt className="text-slate-500">Matrícula</dt>
-              <dd className="font-medium text-slate-900">{membro.matricula}</dd>
+              <dd className="font-medium text-slate-900">{membro.matricula ?? '—'}</dd>
             </div>
             <div>
               <dt className="text-slate-500">Telefone</dt>
@@ -134,6 +141,10 @@ export function MembroDetalhe({ membro, isAdmin }: { membro: Membro; isAdmin: bo
             <div>
               <dt className="text-slate-500">Recolhe</dt>
               <dd className="font-medium text-slate-900">{membro.recolhe ? 'Sim' : 'Não'}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">Em iniciação</dt>
+              <dd className="font-medium text-slate-900">{membro.em_iniciacao ? 'Sim' : 'Não'}</dd>
             </div>
             <div>
               <dt className="text-slate-500">Situação</dt>

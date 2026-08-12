@@ -31,6 +31,7 @@ export async function criarMembro(
   const doQuadro = formData.get('doQuadro') === 'on'
   const remido = formData.get('remido') === 'on'
   const recolhe = formData.get('recolhe') === 'on'
+  const emIniciacao = formData.get('emIniciacao') === 'on'
 
   const validacao = validarMembro({ nome, matricula })
   if (!validacao.valido) {
@@ -40,11 +41,12 @@ export async function criarMembro(
   const supabaseAdmin = createSupabaseServiceRoleClient()
   const dadosPersistidos = {
     nome: nome.trim(),
-    matricula: matricula.trim(),
+    matricula: matricula.trim() || null,
     telefone: telefone.trim() || null,
     do_quadro: doQuadro,
     remido,
     recolhe,
+    em_iniciacao: emIniciacao,
   }
 
   const { data: criado, error } = await supabaseAdmin
@@ -106,6 +108,7 @@ export async function atualizarMembro(
     doQuadro: boolean
     remido: boolean
     recolhe: boolean
+    emIniciacao: boolean
   }
 ): Promise<{ error?: string }> {
   let admin
@@ -123,17 +126,18 @@ export async function atualizarMembro(
   const supabaseAdmin = createSupabaseServiceRoleClient()
   const { data: anterior } = await supabaseAdmin
     .from('membros')
-    .select('nome, matricula, telefone, do_quadro, remido, recolhe')
+    .select('nome, matricula, telefone, do_quadro, remido, recolhe, em_iniciacao')
     .eq('id', id)
     .single()
 
   const dadosPersistidos = {
     nome: dados.nome.trim(),
-    matricula: dados.matricula.trim(),
+    matricula: dados.matricula.trim() || null,
     telefone: dados.telefone.trim() || null,
     do_quadro: dados.doQuadro,
     remido: dados.remido,
     recolhe: dados.recolhe,
+    em_iniciacao: dados.emIniciacao,
   }
 
   const { data: atualizado, error } = await supabaseAdmin

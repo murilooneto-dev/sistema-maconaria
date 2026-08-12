@@ -170,10 +170,11 @@ A assinatura de recibo (`assinatura_url` em `loja_config`, que a partir desta re
 | `id` | `uuid` | Sim | `gen_random_uuid()` | PK. |
 | `nome` | `text` | Sim | — | — |
 | `telefone` | `text` | Não | — | — |
-| `matricula` | `text` | Sim | — | `unique`. |
+| `matricula` | `text` | Não | — | `unique`. Ficou nullable em `00000000000024_membros_em_iniciacao.sql` — membros em processo de iniciação ainda não têm matrícula da Loja (múltiplos `NULL` não colidem com a constraint `unique`, o Postgres os trata como distintos). |
 | `do_quadro` | `boolean` | Sim | `true` | Pertence ao quadro atual da Loja. |
 | `remido` | `boolean` | Sim | `false` | Membro remido (isento de mensalidade normal — ver SPEC §9). |
 | `recolhe` | `boolean` | Sim | `false` | Indica se recolhe (flag operacional de quadro, conforme SPEC §6). |
+| `em_iniciacao` | `boolean` | Sim | `false` | Desde `00000000000024_membros_em_iniciacao.sql` — flag puramente informativa (não altera regra de negócio nenhuma), a pedido do usuário. |
 | `situacao` | `text` | Sim | `'ATIVO'` | `'ATIVO'` ou `'INATIVO'` (check). |
 | `data_cadastro` | `date` | Sim | `current_date` | — |
 | `created_at` / `updated_at` | `timestamptz` | Sim | `now()` | — |
@@ -894,6 +895,7 @@ Migrations SQL são versionadas numericamente sob `supabase/migrations/`:
 - `00000000000021_campanhas_fase8.sql` — Fase 8: seed da categoria de sistema "Campanha" (ENTRADA) em `categorias_movimentacao`, usada pelo vínculo automático de doação.
 - `00000000000022_grande_loja_fase9.sql` — Fase 9: `repasses_grande_loja.conta_id` (not null), `movimentacoes.repasse_grande_loja_id`, seed da categoria de sistema "Grande Loja" (SAIDA).
 - `00000000000023_assinatura_tesoureiro.sql` — `loja_config.assinatura_tesoureiro_url` e `recibos.assinatura_tesoureiro_url`, para o recibo em PDF mostrar as assinaturas do Venerável Mestre e do Tesoureiro lado a lado.
+- `00000000000024_membros_em_iniciacao.sql` — `membros.matricula` deixa de ser `NOT NULL` e ganha a coluna `em_iniciacao` (flag informativa).
 
 `supabase/seed.sql` (não numerado, não é migration) contém dados de desenvolvimento: formas de pagamento padrão e a linha singleton de `loja_config`. Não é aplicado automaticamente em produção.
 
