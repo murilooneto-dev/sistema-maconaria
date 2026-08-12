@@ -94,7 +94,7 @@ export async function gerarRecibo(_prevState: ActionState, formData: FormData): 
 
   const { data: lojaConfig } = await supabaseAdmin
     .from('loja_config')
-    .select('assinatura_url')
+    .select('assinatura_url, assinatura_tesoureiro_url')
     .eq('id', 1)
     .single()
 
@@ -109,6 +109,7 @@ export async function gerarRecibo(_prevState: ActionState, formData: FormData): 
       data,
       descricao,
       assinatura_url: lojaConfig?.assinatura_url ?? null,
+      assinatura_tesoureiro_url: lojaConfig?.assinatura_tesoureiro_url ?? null,
       usuario_id: usuario.id,
       pagamento_id: tipo === 'MENSALIDADE' ? pagamentoId : null,
       doacao_id: tipo === 'CAMPANHA' ? doacaoId : null,

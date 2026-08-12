@@ -1,32 +1,42 @@
 'use client'
 
 import { useActionState } from 'react'
-import { atualizarAssinatura } from './actions'
+import { atualizarAssinatura, atualizarAssinaturaTesoureiro } from './actions'
 
-export function AssinaturaForm({ assinaturaUrl }: { assinaturaUrl: string | null }) {
-  const [state, formAction, pending] = useActionState(atualizarAssinatura, undefined)
+export function AssinaturaForm({
+  titulo,
+  cargo,
+  assinaturaUrl,
+  tesoureiro,
+}: {
+  titulo: string
+  cargo: string
+  assinaturaUrl: string | null
+  tesoureiro: boolean
+}) {
+  const [state, formAction, pending] = useActionState(
+    tesoureiro ? atualizarAssinaturaTesoureiro : atualizarAssinatura,
+    undefined
+  )
 
   return (
-    <form
-      action={formAction}
-      className="max-w-md space-y-4 rounded-lg border border-slate-200 bg-white p-6"
-    >
+    <form action={formAction} className="space-y-4 rounded-lg border border-slate-200 bg-white p-6">
       <div className="space-y-1">
-        <p className="text-sm font-medium text-slate-700">Cargo (fixo)</p>
-        <p className="text-sm text-slate-500">Venerável Mestre</p>
+        <p className="text-sm font-medium text-slate-700">{titulo}</p>
+        <p className="text-sm text-slate-500">Cargo (fixo): {cargo}</p>
       </div>
 
       {assinaturaUrl && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={assinaturaUrl} alt="Assinatura atual" className="h-16 max-w-full object-contain" />
+        <img src={assinaturaUrl} alt={`Assinatura atual — ${cargo}`} className="h-16 max-w-full object-contain" />
       )}
 
       <div className="space-y-1">
-        <label htmlFor="assinatura" className="text-sm font-medium text-slate-700">
+        <label htmlFor={`assinatura-${cargo}`} className="text-sm font-medium text-slate-700">
           Imagem da assinatura
         </label>
         <input
-          id="assinatura"
+          id={`assinatura-${cargo}`}
           name="assinatura"
           type="file"
           accept="image/*"

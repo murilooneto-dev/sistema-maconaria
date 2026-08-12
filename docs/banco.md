@@ -84,7 +84,8 @@ As três são `stable`, `security definer` e `set search_path = ''`, seguindo o 
 | `id` | `smallint` | Sim | `1` | PK fixa; `check (id = 1)` garante linha única (padrão "singleton row"). |
 | `nome` | `text` | Sim | — | Nome da Loja. |
 | `logo_url` | `text` | Não | — | URL do logo (Supabase Storage). |
-| `assinatura_url` | `text` | Não | — | Caminho (path) do objeto no bucket privado `loja-assinaturas` do Supabase Storage — não é mais uma URL pública desde `00000000000018_assinaturas_privadas.sql`. Coluna adicionada por `00000000000016_loja_assets.sql` (Fase 4). |
+| `assinatura_url` | `text` | Não | — | Caminho (path) do objeto no bucket privado `loja-assinaturas` do Supabase Storage — não é mais uma URL pública desde `00000000000018_assinaturas_privadas.sql`. Coluna adicionada por `00000000000016_loja_assets.sql` (Fase 4). Assinatura do **Venerável Mestre**. |
+| `assinatura_tesoureiro_url` | `text` | Não | — | Mesmo padrão de `assinatura_url`, mas do **Tesoureiro** — desde `00000000000023_assinatura_tesoureiro.sql`. O recibo em PDF mostra as duas lado a lado. |
 | `created_at` / `updated_at` | `timestamptz` | Sim | `now()` | Auditoria temporal padrão. |
 
 ### Constraints
@@ -628,7 +629,8 @@ A soma de `pagamento_mensalidades.valor_aplicado` para uma dada `mensalidade_id`
 | `referencia` | `text` | Sim | — | Texto livre (ex.: competência quitada, ou título da campanha). |
 | `data` | `date` | Sim | — | — |
 | `descricao` | `text` | Não | — | — |
-| `assinatura_url` | `text` | Não | — | *Path* (não URL) da imagem de assinatura no bucket privado `loja-assinaturas`, **congelado no momento da emissão** — snapshot de `loja_config.assinatura_url` na hora do `INSERT`, para o PDF de um recibo antigo continuar mostrando a assinatura que valia quando foi emitido, mesmo que a assinatura configurada mude depois (CLAUDE.md §5: alterar configuração futura nunca altera histórico). |
+| `assinatura_url` | `text` | Não | — | *Path* (não URL) da imagem de assinatura do Venerável Mestre no bucket privado `loja-assinaturas`, **congelado no momento da emissão** — snapshot de `loja_config.assinatura_url` na hora do `INSERT`, para o PDF de um recibo antigo continuar mostrando a assinatura que valia quando foi emitido, mesmo que a assinatura configurada mude depois (CLAUDE.md §5: alterar configuração futura nunca altera histórico). |
+| `assinatura_tesoureiro_url` | `text` | Não | — | Mesmo padrão de `assinatura_url`, mas do Tesoureiro (snapshot de `loja_config.assinatura_tesoureiro_url`) — desde `00000000000023_assinatura_tesoureiro.sql`. |
 | `usuario_id` | `uuid` | Sim | — | FK → `profiles(id)` — quem emitiu. |
 | `pagamento_id` | `uuid` | Não | — | FK → `pagamentos(id)`. |
 | `doacao_id` | `uuid` | Não | — | FK → `doacoes(id)`. |
@@ -891,6 +893,7 @@ Migrations SQL são versionadas numericamente sob `supabase/migrations/`:
 - `00000000000020_financeiro_fase7.sql` — Fase 7: cria `categorias_movimentacao` (com trigger que protege a categoria de sistema "Mensalidade"), troca `movimentacoes.categoria` (texto livre) por `categoria_id` (FK), e adiciona o trigger `bloqueia_cancelamento_periodo_fechado` em `movimentacoes`/`transferencias`.
 - `00000000000021_campanhas_fase8.sql` — Fase 8: seed da categoria de sistema "Campanha" (ENTRADA) em `categorias_movimentacao`, usada pelo vínculo automático de doação.
 - `00000000000022_grande_loja_fase9.sql` — Fase 9: `repasses_grande_loja.conta_id` (not null), `movimentacoes.repasse_grande_loja_id`, seed da categoria de sistema "Grande Loja" (SAIDA).
+- `00000000000023_assinatura_tesoureiro.sql` — `loja_config.assinatura_tesoureiro_url` e `recibos.assinatura_tesoureiro_url`, para o recibo em PDF mostrar as assinaturas do Venerável Mestre e do Tesoureiro lado a lado.
 
 `supabase/seed.sql` (não numerado, não é migration) contém dados de desenvolvimento: formas de pagamento padrão e a linha singleton de `loja_config`. Não é aplicado automaticamente em produção.
 
