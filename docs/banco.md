@@ -614,7 +614,7 @@ A soma de `pagamento_mensalidades.valor_aplicado` para uma dada `mensalidade_id`
 
 **Namespace:** `public.recibos` · **Migration:** `00000000000011_recibos.sql`
 
-**Responsabilidade:** Registro do recibo emitido (PDF, gerado na Fase 10) para um pagamento de mensalidade ou uma doação de campanha.
+**Responsabilidade:** Registro do recibo emitido para um pagamento de mensalidade ou uma doação de campanha. O PDF em si (Fase 10) **não é armazenado** — é gerado sob demanda a cada download (`GET /recibos/[id]/pdf`) a partir dos dados desta linha; a linha é a fonte de verdade do histórico (SPEC §27 "manter histórico dos recibos").
 
 ### Campos
 
@@ -628,7 +628,7 @@ A soma de `pagamento_mensalidades.valor_aplicado` para uma dada `mensalidade_id`
 | `referencia` | `text` | Sim | — | Texto livre (ex.: competência quitada, ou título da campanha). |
 | `data` | `date` | Sim | — | — |
 | `descricao` | `text` | Não | — | — |
-| `assinatura_url` | `text` | Não | — | URL do PDF/assinatura em Supabase Storage (Fase 10). |
+| `assinatura_url` | `text` | Não | — | *Path* (não URL) da imagem de assinatura no bucket privado `loja-assinaturas`, **congelado no momento da emissão** — snapshot de `loja_config.assinatura_url` na hora do `INSERT`, para o PDF de um recibo antigo continuar mostrando a assinatura que valia quando foi emitido, mesmo que a assinatura configurada mude depois (CLAUDE.md §5: alterar configuração futura nunca altera histórico). |
 | `usuario_id` | `uuid` | Sim | — | FK → `profiles(id)` — quem emitiu. |
 | `pagamento_id` | `uuid` | Não | — | FK → `pagamentos(id)`. |
 | `doacao_id` | `uuid` | Não | — | FK → `doacoes(id)`. |

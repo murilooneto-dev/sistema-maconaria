@@ -13,6 +13,7 @@ Este documento descreve a estrutura de pastas, o fluxo de autenticação e os m�
 - **Supabase** (PostgreSQL + Supabase Auth) como backend.
 - **Vitest** para testes unitários.
 - **ESLint** (`eslint-config-next`) para lint.
+- **pdf-lib** para geração de PDF (recibos, Fase 10) — gerado sob demanda a partir dos dados gravados, não fica armazenado em Storage.
 
 ---
 
@@ -67,7 +68,11 @@ Este documento descreve a estrutura de pastas, o fluxo de autenticação e os m�
 │       │   ├── actions.ts              # Server Actions: marcarComoEnviado(), cancelarRepasse()
 │       │   ├── ItensPendentesForm.tsx  # Seleção de itens PENDENTE + envio (Client Component)
 │       │   └── HistoricoRepasses.tsx   # Histórico filtrável por mês/ano + cancelar (Client Component)
-│       ├── recibos/page.tsx      # Placeholder (fase futura)
+│       ├── recibos/                   # Módulo Recibos — Fase 10
+│       │   ├── page.tsx                # Histórico + filtros (tipo/período/pessoa) + link "Baixar PDF" (Server Component)
+│       │   ├── actions.ts              # Server Action: gerarRecibo() — a partir de um pagamento (Mensalidade) ou doação (Campanha)
+│       │   ├── [id]/pdf/route.ts       # Route Handler: gera o PDF sob demanda (não fica armazenado em Storage)
+│       │   └── novo/                   # Fluxo de seleção (membro→pagamento ou campanha→doação) + geração
 │       ├── relatorios/page.tsx   # Placeholder (fase futura)
 │       └── configuracoes/
 │           ├── page.tsx          # Hub de configurações (links para os submódulos, todos habilitados desde a Fase 4)
@@ -134,13 +139,17 @@ Este documento descreve a estrutura de pastas, o fluxo de autenticação e os m�
 │   │   ├── pagamentos.test.ts    # Testes unitários de validação de pagamentos — Fase 6
 │   │   ├── financeiro.ts         # validarMovimentacao(), validarTransferencia(), calcularSaldoConta(), calcularFechamento(), podeFecharPeriodo(), podeReabrir() — Fase 7
 │   │   ├── campanhas.ts          # validarCampanha(), validarDoacao(), calcularArrecadado(), calcularPercentual(), deveConcluirAutomaticamente() — Fase 8
-│   │   └── grande-loja.ts        # calcularTotal(), validarSelecaoRepasse() — Fase 9
+│   │   ├── grande-loja.ts        # calcularTotal(), validarSelecaoRepasse() — Fase 9
+│   │   └── recibos.ts            # validarGeracaoRecibo() — Fase 10
 │   ├── mensalidades/
 │   │   └── recalcular-situacao.ts # recalcularSituacaoMembro() — centraliza sincronização de situação após pagamento/cancelamento — Fase 6
 │   ├── campanhas/                # Fase 8
 │   │   └── recalcular-status.ts  # recalcularStatusCampanha() — EM_ANDAMENTO → CONCLUIDA automático ao atingir a meta (nunca reabre sozinho)
 │   ├── grande-loja/              # Fase 9
 │   │   └── sincronizar-item.ts   # sincronizarItemGrandeLoja() — cria/cancela item de repasse conforme a mensalidade fica QUITADA/deixa de estar; chamada de dentro de registrarPagamento/cancelarPagamento (Fase 6)
+│   ├── pdf/                      # Fase 10
+│   │   ├── recibo.ts             # gerarPdfRecibo() — monta o PDF (pdf-lib): logo, dados, assinatura, cargo fixo "Venerável Mestre", data DD/MM/YYYY
+│   │   └── imagens.ts            # buscarImagemStorage() — baixa logo/assinatura do Storage e devolve bytes prontos para embutir (só PNG/JPEG)
 │   ├── financeiro/               # Fase 7
 │   │   ├── constantes.ts         # CATEGORIA_MENSALIDADE_ID, CATEGORIA_CAMPANHA_ID, CATEGORIA_GRANDE_LOJA_ID — UUIDs fixos das categorias de sistema
 │   │   ├── periodo.ts            # periodoEstaFechado() — checagem de fechamento em código de aplicação (usado por pagamentos, movimentações e transferências)
@@ -148,6 +157,7 @@ Este documento descreve a estrutura de pastas, o fluxo de autenticação e os m�
 │   │   ├── movimentacao-pagamento.ts # criarMovimentacaoPagamento()/cancelarMovimentacaoPagamento() — vínculo entre pagamento de mensalidade e financeiro
 │   │   ├── movimentacao-doacao.ts    # criarMovimentacaoDoacao()/cancelarMovimentacaoDoacao() — vínculo entre doação e financeiro — Fase 8
 │   │   └── movimentacao-repasse.ts   # criarMovimentacaoRepasse()/cancelarMovimentacaoRepasse() — vínculo entre repasse à Grande Loja (SAIDA) e financeiro — Fase 9
+│   ├── format.ts                 # formatarDataBR() — formata date do Postgres (YYYY-MM-DD) para DD/MM/YYYY — Fase 9
 │   └── supabase/
 │       ├── client.ts             # createSupabaseBrowserClient() — uso em Client Components
 │       ├── server.ts             # createSupabaseServerClient() — uso em Server Components/Actions
@@ -245,6 +255,8 @@ Ver `.env.example` na raiz e `docs/instalacao.md` para o passo a passo de config
 
 - **Fase 9 (Grande Loja):** criação de itens em `repasses_grande_loja_itens` (antes deliberadamente fora de escopo, Fase 2) — todo item PENDENTE é criado/cancelado automaticamente conforme a mensalidade correspondente fica QUITADA ou deixa de estar (`sincronizarItemGrandeLoja`, chamada de dentro de `registrarPagamento`/`cancelarPagamento`, non-fatal). Tela `/grande-loja` com resumo, seleção de itens pendentes e "marcar como enviado" (decisão do usuário, 2026-08-12: isso gera uma movimentação **SAIDA** real no financeiro, debitando a conta escolhida — dinheiro de Grande Loja acumulado no saldo da Loja passa a sair de fato do caixa). Cancelar um repasse reabre os itens (voltam a PENDENTE) e cancela a movimentação vinculada. Um item já ENVIADO não é revertido automaticamente se o pagamento de mensalidade original for cancelado depois — limitação conhecida, documentada em código, requer conferência manual. **Sem PDF/Excel** (fica para a Fase 11 — Relatórios) e **sem testes automatizados**, mesmo padrão das Fases 7–8.
 
-## Fora de escopo (Fase 9)
+- **Fase 10 (Recibos):** geração de recibo (Mensalidade a partir de um pagamento ATIVO, Campanha a partir de uma doação ATIVA) com PDF gerado sob demanda via Route Handler (`/recibos/[id]/pdf`, `pdf-lib`) — não armazenado em Storage, recriado a cada download a partir dos dados gravados em `recibos` e da assinatura/logo vigentes na época (a `assinatura_url` é congelada no momento da geração, preservando o histórico mesmo que a assinatura configurada mude depois). Cargo fixo "Venerável Mestre", data em DD/MM/YYYY (`formatarDataBR`). Sem edição/exclusão de recibo (só `INSERT`/`SELECT` no banco — reemitir uma segunda via cria um novo registro). **Sem testes automatizados**, mesmo padrão das Fases 7–9.
 
-Conforme `PROMPT_INICIAL.md`: recibos (geração em PDF) e relatórios (incluindo exportação PDF/Excel do relatório Grande Loja) existem apenas como rotas placeholder ou funcionalidade pendente — sem lógica de negócio em andamento, sem tabelas de domínio e sem testes. Essas funcionalidades são para as fases seguintes.
+## Fora de escopo (Fase 10)
+
+Conforme `PROMPT_INICIAL.md`: relatórios (incluindo exportação PDF/Excel do relatório Grande Loja e demais relatórios do SPEC §29) existem apenas como rota placeholder — sem lógica de negócio em andamento, sem tabelas de domínio e sem testes. Fica para a Fase 11.
