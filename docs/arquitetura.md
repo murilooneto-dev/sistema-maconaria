@@ -62,7 +62,11 @@ Este documento descreve a estrutura de pastas, o fluxo de autenticação e os m�
 │       │   ├── nova/                   # Lançamento manual (Tronco/Recebimentos/Despesas/Custos/Avulsos)
 │       │   ├── transferencias/         # Server Actions registrarTransferencia()/cancelarTransferencia() + tela
 │       │   └── fechamento/             # Fechamento mensal: preview do período candidato, fechar (tesoureiro), reabrir (admin, só o mais recente)
-│       ├── grande-loja/page.tsx  # Placeholder (fase futura)
+│       ├── grande-loja/               # Módulo Grande Loja — Fase 9
+│       │   ├── page.tsx                # Resumo + itens pendentes + histórico de repasses (Server Component)
+│       │   ├── actions.ts              # Server Actions: marcarComoEnviado(), cancelarRepasse()
+│       │   ├── ItensPendentesForm.tsx  # Seleção de itens PENDENTE + envio (Client Component)
+│       │   └── HistoricoRepasses.tsx   # Histórico filtrável por mês/ano + cancelar (Client Component)
 │       ├── recibos/page.tsx      # Placeholder (fase futura)
 │       ├── relatorios/page.tsx   # Placeholder (fase futura)
 │       └── configuracoes/
@@ -129,17 +133,21 @@ Este documento descreve a estrutura de pastas, o fluxo de autenticação e os m�
 │   │   ├── pagamentos.ts         # validarAlocacoes(), calcularNovoStatusMensalidade() — SPEC §11–13 — Fase 6
 │   │   ├── pagamentos.test.ts    # Testes unitários de validação de pagamentos — Fase 6
 │   │   ├── financeiro.ts         # validarMovimentacao(), validarTransferencia(), calcularSaldoConta(), calcularFechamento(), podeFecharPeriodo(), podeReabrir() — Fase 7
-│   │   └── campanhas.ts          # validarCampanha(), validarDoacao(), calcularArrecadado(), calcularPercentual(), deveConcluirAutomaticamente() — Fase 8
+│   │   ├── campanhas.ts          # validarCampanha(), validarDoacao(), calcularArrecadado(), calcularPercentual(), deveConcluirAutomaticamente() — Fase 8
+│   │   └── grande-loja.ts        # calcularTotal(), validarSelecaoRepasse() — Fase 9
 │   ├── mensalidades/
 │   │   └── recalcular-situacao.ts # recalcularSituacaoMembro() — centraliza sincronização de situação após pagamento/cancelamento — Fase 6
 │   ├── campanhas/                # Fase 8
 │   │   └── recalcular-status.ts  # recalcularStatusCampanha() — EM_ANDAMENTO → CONCLUIDA automático ao atingir a meta (nunca reabre sozinho)
+│   ├── grande-loja/              # Fase 9
+│   │   └── sincronizar-item.ts   # sincronizarItemGrandeLoja() — cria/cancela item de repasse conforme a mensalidade fica QUITADA/deixa de estar; chamada de dentro de registrarPagamento/cancelarPagamento (Fase 6)
 │   ├── financeiro/               # Fase 7
-│   │   ├── constantes.ts         # CATEGORIA_MENSALIDADE_ID, CATEGORIA_CAMPANHA_ID — UUIDs fixos das categorias de sistema
+│   │   ├── constantes.ts         # CATEGORIA_MENSALIDADE_ID, CATEGORIA_CAMPANHA_ID, CATEGORIA_GRANDE_LOJA_ID — UUIDs fixos das categorias de sistema
 │   │   ├── periodo.ts            # periodoEstaFechado() — checagem de fechamento em código de aplicação (usado por pagamentos, movimentações e transferências)
 │   │   ├── fechamento.ts         # obterUltimoFechado(), obterRegistroPeriodo(), cálculo de saldo inicial/totais de um período
 │   │   ├── movimentacao-pagamento.ts # criarMovimentacaoPagamento()/cancelarMovimentacaoPagamento() — vínculo entre pagamento de mensalidade e financeiro
-│   │   └── movimentacao-doacao.ts    # criarMovimentacaoDoacao()/cancelarMovimentacaoDoacao() — vínculo entre doação e financeiro — Fase 8
+│   │   ├── movimentacao-doacao.ts    # criarMovimentacaoDoacao()/cancelarMovimentacaoDoacao() — vínculo entre doação e financeiro — Fase 8
+│   │   └── movimentacao-repasse.ts   # criarMovimentacaoRepasse()/cancelarMovimentacaoRepasse() — vínculo entre repasse à Grande Loja (SAIDA) e financeiro — Fase 9
 │   └── supabase/
 │       ├── client.ts             # createSupabaseBrowserClient() — uso em Client Components
 │       ├── server.ts             # createSupabaseServerClient() — uso em Server Components/Actions
@@ -155,7 +163,8 @@ Este documento descreve a estrutura de pastas, o fluxo de autenticação e os m�
 │   │   ├── 00000000000018_assinaturas_privadas.sql # Fase 4 (fix): bucket privado loja-assinaturas
 │   │   ├── 00000000000019_config_mensalidade_append_only.sql # Fase 4 (fix): trigger que bloqueia UPDATE/DELETE em config_mensalidade
 │   │   ├── 00000000000020_financeiro_fase7.sql # Fase 7: categorias_movimentacao (+ trigger de categoria de sistema), movimentacoes.categoria → categoria_id, trigger de bloqueio de cancelamento em período fechado
-│   │   └── 00000000000021_campanhas_fase8.sql # Fase 8: seed da categoria de sistema "Campanha" (ENTRADA) em categorias_movimentacao
+│   │   ├── 00000000000021_campanhas_fase8.sql # Fase 8: seed da categoria de sistema "Campanha" (ENTRADA) em categorias_movimentacao
+│   │   └── 00000000000022_grande_loja_fase9.sql # Fase 9: repasses_grande_loja.conta_id, movimentacoes.repasse_grande_loja_id, seed da categoria de sistema "Grande Loja" (SAIDA)
 │   └── seed.sql                  # dados de desenvolvimento (formas de pagamento padrão, config inicial da loja)
 ├── docs/
 │   ├── arquitetura.md            # Este arquivo
@@ -234,6 +243,8 @@ Ver `.env.example` na raiz e `docs/instalacao.md` para o passo a passo de config
 
 - **Fase 8 (Campanhas):** CRUD de campanhas (cards com meta/arrecadado/saldo/percentual/status), registro de doação (membro ou pessoa externa) com vínculo automático ao financeiro (movimentação ENTRADA/Campanha, criada ao registrar e cancelada ao cancelar a doação), conclusão automática ao atingir a meta (`EM_ANDAMENTO → CONCLUIDA`), conclusão/cancelamento/reabertura manuais. **Sem testes automatizados**, mesmo padrão da Fase 7.
 
-## Fora de escopo (Fase 8)
+- **Fase 9 (Grande Loja):** criação de itens em `repasses_grande_loja_itens` (antes deliberadamente fora de escopo, Fase 2) — todo item PENDENTE é criado/cancelado automaticamente conforme a mensalidade correspondente fica QUITADA ou deixa de estar (`sincronizarItemGrandeLoja`, chamada de dentro de `registrarPagamento`/`cancelarPagamento`, non-fatal). Tela `/grande-loja` com resumo, seleção de itens pendentes e "marcar como enviado" (decisão do usuário, 2026-08-12: isso gera uma movimentação **SAIDA** real no financeiro, debitando a conta escolhida — dinheiro de Grande Loja acumulado no saldo da Loja passa a sair de fato do caixa). Cancelar um repasse reabre os itens (voltam a PENDENTE) e cancela a movimentação vinculada. Um item já ENVIADO não é revertido automaticamente se o pagamento de mensalidade original for cancelado depois — limitação conhecida, documentada em código, requer conferência manual. **Sem PDF/Excel** (fica para a Fase 11 — Relatórios) e **sem testes automatizados**, mesmo padrão das Fases 7–8.
 
-Conforme `PROMPT_INICIAL.md`: Grande Loja, recibos (geração em PDF) e relatórios existem apenas como rotas placeholder na navegação — sem lógica de negócio em andamento, sem tabelas de domínio e sem testes. Essas funcionalidades são para as fases seguintes. Nota: a criação de itens em `repasses_grande_loja_itens` está deliberadamente fora de escopo (decisão registrada na Fase 2) — será implementada conforme o módulo de Grande Loja evoluir (Fase 9).
+## Fora de escopo (Fase 9)
+
+Conforme `PROMPT_INICIAL.md`: recibos (geração em PDF) e relatórios (incluindo exportação PDF/Excel do relatório Grande Loja) existem apenas como rotas placeholder ou funcionalidade pendente — sem lógica de negócio em andamento, sem tabelas de domínio e sem testes. Essas funcionalidades são para as fases seguintes.

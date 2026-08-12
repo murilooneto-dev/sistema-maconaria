@@ -13,6 +13,7 @@ import {
 import { recalcularSituacaoMembro } from '@/lib/mensalidades/recalcular-situacao'
 import { criarMovimentacaoPagamento, cancelarMovimentacaoPagamento } from '@/lib/financeiro/movimentacao-pagamento'
 import { periodoEstaFechado } from '@/lib/financeiro/periodo'
+import { sincronizarItemGrandeLoja } from '@/lib/grande-loja/sincronizar-item'
 
 type ActionState = { error: string } | { success: string } | undefined
 
@@ -337,6 +338,15 @@ export async function registrarPagamento(
       valorDevidoAntes,
       valorPagoAntes,
     })
+
+    try {
+      await sincronizarItemGrandeLoja(supabaseAdmin, alocacao.mensalidadeId)
+    } catch (glError) {
+      console.error(
+        `Falha ao sincronizar item de Grande Loja da mensalidade ${alocacao.mensalidadeId}:`,
+        glError
+      )
+    }
   }
 
   // Vínculo com o financeiro (Fase 7): só cria a movimentação depois que
@@ -525,6 +535,12 @@ export async function cancelarPagamento(pagamentoId: string, motivo: string): Pr
       return {
         error: `O cancelamento do pagamento foi efetivado, mas a reversão de valores está incompleta (falha ao reverter a competência ${vinculo.mensalidade_id}). Contate o suporte para conferência manual do pagamento ${pagamentoId}.`,
       }
+    }
+
+    try {
+      await sincronizarItemGrandeLoja(supabaseAdmin, vinculo.mensalidade_id)
+    } catch (glError) {
+      console.error(`Falha ao sincronizar item de Grande Loja da mensalidade ${vinculo.mensalidade_id}:`, glError)
     }
   }
 
