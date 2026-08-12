@@ -64,12 +64,20 @@ export default async function MembrosPage({
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-slate-900">Membros</h1>
         {isAdmin && (
-          <Link
-            href="/membros/novo"
-            className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white"
-          >
-            Novo Membro
-          </Link>
+          <div className="flex gap-2">
+            <Link
+              href="/membros/importar"
+              className="rounded border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700"
+            >
+              Importar CSV
+            </Link>
+            <Link
+              href="/membros/novo"
+              className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white"
+            >
+              Novo Membro
+            </Link>
+          </div>
         )}
       </div>
 
