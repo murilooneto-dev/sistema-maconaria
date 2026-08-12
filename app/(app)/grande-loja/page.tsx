@@ -53,7 +53,7 @@ export default async function GrandeLojaPage({
 
   let query = supabase
     .from('repasses_grande_loja')
-    .select('id, data_envio, valor_total, observacao, status, usuario_id, contas(nome)')
+    .select('id, data_envio, valor_total, observacao, status, usuario_id, contas(nome), profiles(nome)')
     .order('data_envio', { ascending: false })
 
   if (params.ano && params.mes) {
@@ -68,6 +68,27 @@ export default async function GrandeLojaPage({
   const totalEnviado = (repasses ?? [])
     .filter((r) => r.status === 'ENVIADO')
     .reduce((s, r) => s + Number(r.valor_total), 0)
+
+  type ItemRepasse = {
+    id: string
+    valor: number
+    repasse_id: string | null
+    mensalidades: { ano: number; mes: number; membros: { nome: string }[] | { nome: string } | null }[] | { ano: number; mes: number; membros: { nome: string }[] | { nome: string } | null } | null
+  }
+
+  const repasseIds = (repasses ?? []).map((r) => r.id)
+  const { data: itensDosRepasses } = await supabase
+    .from('repasses_grande_loja_itens')
+    .select('id, valor, repasse_id, mensalidades(ano, mes, membros(nome))')
+    .in('repasse_id', repasseIds.length > 0 ? repasseIds : ['00000000-0000-0000-0000-000000000000'])
+
+  const itensPorRepasse = new Map<string, ItemRepasse[]>()
+  for (const item of (itensDosRepasses ?? []) as ItemRepasse[]) {
+    if (!item.repasse_id) continue
+    const lista = itensPorRepasse.get(item.repasse_id) ?? []
+    lista.push(item)
+    itensPorRepasse.set(item.repasse_id, lista)
+  }
 
   return (
     <div className="space-y-6">
@@ -100,7 +121,12 @@ export default async function GrandeLojaPage({
         />
       )}
 
-      <HistoricoRepasses repasses={repasses ?? []} podeEditar={podeEditar} filtro={params} />
+      <HistoricoRepasses
+        repasses={repasses ?? []}
+        itensPorRepasse={Object.fromEntries(itensPorRepasse)}
+        podeEditar={podeEditar}
+        filtro={params}
+      />
     </div>
   )
 }
