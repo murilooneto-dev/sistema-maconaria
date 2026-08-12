@@ -45,13 +45,28 @@ type AlocacaoAplicada = {
  * C2 da revisão da Tarefa 5 — sem isso, uma falha parcial deixava um
  * pagamento ATIVO órfão, com valor_total cobrindo alocações que nunca
  * foram de fato aplicadas.
+ *
+ * N1 (Fix round 2): a reversão usa lock otimista — só reverte uma
+ * mensalidade se `valor_pago` ainda for exatamente o valor que ESTA
+ * aplicação escreveu (`valorPagoAntes + valorAplicado`). Sem isso, se um
+ * pagamento concorrente alterasse a mesma competência entre a aplicação e
+ * a compensação, a reversão incondicional apagaria o valor desse
+ * pagamento concorrente sem deixar rastro. Quando o lock falha, a
+ * mensalidade entra em `falhasDeReversao` (retornado ao chamador) em vez
+ * de ser assumida como revertida com sucesso.
+ *
+ * N2 (Fix round 2): registra auditoria do cancelamento automático,
+ * incluindo quais mensalidades (se houver) não puderam ser revertidas —
+ * nunca falha silenciosamente.
  */
 async function compensarFalhaParcial(
   supabaseAdmin: ReturnType<typeof createSupabaseServiceRoleClient>,
   pagamentoId: string,
   aplicadas: AlocacaoAplicada[],
   usuarioId: string
-): Promise<void> {
+): Promise<string[]> {
+  const falhasDeReversao: string[] = []
+
   for (const item of aplicadas) {
     const novoValorPago = arredondarCentavos(item.valorPagoAntes)
     const novoStatus =
@@ -62,7 +77,23 @@ async function compensarFalhaParcial(
     if (novoStatus !== 'QUITADA') {
       payload.data_quitacao = null
     }
-    await supabaseAdmin.from('mensalidades').update(payload).eq('id', item.mensalidadeId)
+
+    const valorEsperadoAntesDoRevert = arredondarCentavos(item.valorPagoAntes + item.valorAplicado)
+
+    const { data: revertida, error: revertError } = await supabaseAdmin
+      .from('mensalidades')
+      .update(payload)
+      .eq('id', item.mensalidadeId)
+      .eq('valor_pago', valorEsperadoAntesDoRevert) // lock otimista: só reverte se o valor ainda é o que esta função aplicou
+      .select('id')
+      .maybeSingle()
+
+    if (revertError || !revertida) {
+      falhasDeReversao.push(item.mensalidadeId)
+      console.error(
+        `Falha ao reverter mensalidade ${item.mensalidadeId} durante compensação automática — valor pode ter sido alterado por outra operação concorrente. Requer correção manual.`
+      )
+    }
   }
 
   await supabaseAdmin
@@ -75,6 +106,28 @@ async function compensarFalhaParcial(
     })
     .eq('id', pagamentoId)
     .eq('status', 'ATIVO')
+
+  try {
+    await registrarAuditoria({
+      usuarioId,
+      modulo: 'mensalidades',
+      acao: 'CANCELAMENTO_AUTOMATICO_PARCIAL',
+      registroTabela: 'pagamentos',
+      registroId: pagamentoId,
+      dadosNovos: {
+        mensalidadesRevertidas: aplicadas.length - falhasDeReversao.length,
+        mensalidadesComFalhaDeReversao: falhasDeReversao,
+      },
+      descricao:
+        falhasDeReversao.length > 0
+          ? `Cancelamento automático do pagamento ${pagamentoId} após falha no registro — ${falhasDeReversao.length} competência(s) não puderam ser revertidas automaticamente e precisam de conferência manual.`
+          : `Cancelamento automático do pagamento ${pagamentoId} após falha no registro de todas as competências selecionadas.`,
+    })
+  } catch (auditError) {
+    console.error('Falha ao registrar auditoria do cancelamento automático:', auditError)
+  }
+
+  return falhasDeReversao
 }
 
 export async function registrarPagamento(
@@ -186,7 +239,17 @@ export async function registrarPagamento(
 
     if (linkError) {
       // C2: desfaz o que já foi aplicado e cancela o pagamento órfão.
-      await compensarFalhaParcial(supabaseAdmin, pagamento.id, aplicadasComSucesso, usuario.id)
+      const falhasDeReversao = await compensarFalhaParcial(
+        supabaseAdmin,
+        pagamento.id,
+        aplicadasComSucesso,
+        usuario.id
+      )
+      if (falhasDeReversao.length > 0) {
+        return {
+          error: `Falha ao registrar pagamento. O pagamento foi cancelado, mas ${falhasDeReversao.length} competência(s) podem precisar de conferência manual (contate o suporte com o ID do pagamento: ${pagamento.id}).`,
+        }
+      }
       return {
         error: `Falha ao vincular competência ao pagamento: ${linkError.message}. O pagamento foi cancelado automaticamente.`,
       }
@@ -201,6 +264,10 @@ export async function registrarPagamento(
     // a leitura. Sem isso, dois pagamentos concorrentes na mesma
     // competência poderiam ambos ler valor_pago=0, ambos passar na
     // validação de saldo e ambos escrever, duplicando o valor aplicado.
+    // N3 (Fix round 2): usa `.maybeSingle()` em vez de `.single()` — com
+    // `.single()`, zero linhas afetadas pelo lock vira um erro genérico do
+    // PostgREST (nunca `data: null`), então a branch de "operação
+    // simultânea" abaixo nunca era alcançada de fato.
     const { data: atualizada, error: updateError } = await supabaseAdmin
       .from('mensalidades')
       .update({
@@ -211,14 +278,43 @@ export async function registrarPagamento(
       .eq('id', alocacao.mensalidadeId)
       .eq('valor_pago', mensalidade.valor_pago)
       .select('id')
-      .single()
+      .maybeSingle()
 
-    if (updateError || !atualizada) {
-      await compensarFalhaParcial(supabaseAdmin, pagamento.id, aplicadasComSucesso, usuario.id)
+    if (updateError) {
+      const falhasDeReversao = await compensarFalhaParcial(
+        supabaseAdmin,
+        pagamento.id,
+        aplicadasComSucesso,
+        usuario.id
+      )
+      if (falhasDeReversao.length > 0) {
+        return {
+          error: `Falha ao registrar pagamento. O pagamento foi cancelado, mas ${falhasDeReversao.length} competência(s) podem precisar de conferência manual (contate o suporte com o ID do pagamento: ${pagamento.id}).`,
+        }
+      }
       return {
-        error: updateError
-          ? `Falha ao atualizar competência: ${updateError.message}. O pagamento foi cancelado automaticamente.`
-          : 'Uma das competências selecionadas foi alterada por outra operação simultânea. Tente novamente.',
+        error: `Falha ao atualizar competência: ${updateError.message}. O pagamento foi cancelado automaticamente.`,
+      }
+    }
+
+    if (!atualizada) {
+      // N1/N3: data null (sem erro) com .maybeSingle() = o lock otimista
+      // não encontrou a linha com o valor_pago esperado — outra operação
+      // alterou a competência entre a leitura e este update.
+      const falhasDeReversao = await compensarFalhaParcial(
+        supabaseAdmin,
+        pagamento.id,
+        aplicadasComSucesso,
+        usuario.id
+      )
+      if (falhasDeReversao.length > 0) {
+        return {
+          error: `Falha ao registrar pagamento. O pagamento foi cancelado, mas ${falhasDeReversao.length} competência(s) podem precisar de conferência manual (contate o suporte com o ID do pagamento: ${pagamento.id}).`,
+        }
+      }
+      return {
+        error:
+          'Uma das competências selecionadas foi alterada por outra operação simultânea. Tente novamente. O pagamento foi cancelado automaticamente.',
       }
     }
 
@@ -354,7 +450,33 @@ export async function cancelarPagamento(pagamentoId: string, motivo: string): Pr
       .eq('id', vinculo.mensalidade_id)
 
     if (updateError) {
-      return { error: `Falha ao reverter competência: ${updateError.message}` }
+      // N2.3: o cancelamento já foi reivindicado (pagamento CANCELADO) —
+      // não há como tentar de novo (a guarda no topo bloqueia), então essa
+      // falha de reversão não pode ficar silenciosa. Registra auditoria e
+      // devolve uma mensagem clara pedindo conferência manual, em vez de
+      // um erro genérico.
+      try {
+        await registrarAuditoria({
+          usuarioId: usuario.id,
+          modulo: 'mensalidades',
+          acao: 'CANCELAMENTO_COM_REVERSAO_INCOMPLETA',
+          registroTabela: 'pagamentos',
+          registroId: pagamentoId,
+          dadosAnteriores: { mensalidades: estadoAnterior },
+          dadosNovos: {
+            motivo: motivo.trim(),
+            mensalidadeComFalha: vinculo.mensalidade_id,
+            erro: updateError.message,
+          },
+          descricao: `Cancelamento do pagamento ${pagamentoId} foi efetivado, mas a reversão da competência ${vinculo.mensalidade_id} falhou (${updateError.message}). Requer conferência manual.`,
+        })
+      } catch (auditError) {
+        console.error('Falha ao registrar auditoria de reversão incompleta:', auditError)
+      }
+
+      return {
+        error: `O cancelamento do pagamento foi efetivado, mas a reversão de valores está incompleta (falha ao reverter a competência ${vinculo.mensalidade_id}). Contate o suporte para conferência manual do pagamento ${pagamentoId}.`,
+      }
     }
   }
 
