@@ -10,10 +10,15 @@ type MembroParaGeracao = {
 
 /**
  * Gera as competências pendentes de UM membro, do mês seguinte ao cadastro
- * (SPEC §10) até o mês atual, usando a configuração de mensalidade vigente
- * hoje (decisão confirmada com o usuário em 2026-08-11). Não gera nada se
- * não houver configuração cadastrada para o tipo do membro (normal/remido),
- * ou se não houver competência pendente ainda (ex: cadastro neste mês).
+ * (SPEC §10) até dezembro do ano corrente — inclui competências futuras
+ * ainda não vencidas (decisão confirmada com o usuário em 2026-08-12: "as
+ * mensalidades do momento que ele entrou e as FUTURAS, nunca para trás").
+ * Usa a configuração de mensalidade vigente hoje, gravada como snapshot em
+ * cada competência gerada; se a configuração mudar depois, as competências
+ * futuras já geradas NÃO são recalculadas (regra de ouro de imutabilidade
+ * histórica — trade-off aceito explicitamente pelo usuário). Não gera nada
+ * se não houver configuração cadastrada para o tipo do membro (normal/remido),
+ * ou se não houver competência pendente (ex: cadastro em dezembro).
  *
  * Usada tanto pela geração em lote (`gerarMensalidades`) quanto
  * automaticamente ao cadastrar um membro (`criarMembro`).
@@ -23,7 +28,7 @@ export async function gerarCompetenciasParaMembro(
   membro: MembroParaGeracao
 ): Promise<number> {
   const hoje = new Date()
-  const competenciaAtual: Competencia = { ano: hoje.getUTCFullYear(), mes: hoje.getUTCMonth() + 1 }
+  const fimDoAno: Competencia = { ano: hoje.getUTCFullYear(), mes: 12 }
 
   const { data: config } = await supabaseAdmin
     .from('config_mensalidade')
@@ -44,7 +49,7 @@ export async function gerarCompetenciasParaMembro(
     .select('ano, mes')
     .eq('membro_id', membro.id)
 
-  const faltantes = competenciasFaltantes(primeira, competenciaAtual, existentes ?? [])
+  const faltantes = competenciasFaltantes(primeira, fimDoAno, existentes ?? [])
 
   if (faltantes.length === 0) {
     return 0
