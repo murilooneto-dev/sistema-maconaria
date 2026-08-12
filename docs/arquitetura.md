@@ -49,7 +49,14 @@ Este documento descreve a estrutura de pastas, o fluxo de autenticação e os m�
 │       │       ├── PagamentoForm.tsx       # Client Component: seleção de competências + valores + forma de pagamento + conta
 │       │       └── HistoricoPagamentos.tsx # Client Component: tabela de histórico de pagamentos do membro
 │       ├── campanhas/page.tsx    # Placeholder (fase futura)
-│       ├── financeiro/page.tsx   # Placeholder (fase futura)
+│       ├── financeiro/                # Módulo Financeiro — Fase 7
+│       │   ├── FinanceiroTabs.tsx      # Navegação entre as 4 sub-telas (Client Component)
+│       │   ├── page.tsx                # Movimentações: filtros + tabela + totais (Server Component)
+│       │   ├── actions.ts              # Server Actions: registrarMovimentacao(), cancelarMovimentacao()
+│       │   ├── MovimentacoesTable.tsx  # Tabela com cancelamento (Client Component)
+│       │   ├── nova/                   # Lançamento manual (Tronco/Recebimentos/Despesas/Custos/Avulsos)
+│       │   ├── transferencias/         # Server Actions registrarTransferencia()/cancelarTransferencia() + tela
+│       │   └── fechamento/             # Fechamento mensal: preview do período candidato, fechar (tesoureiro), reabrir (admin, só o mais recente)
 │       ├── grande-loja/page.tsx  # Placeholder (fase futura)
 │       ├── recibos/page.tsx      # Placeholder (fase futura)
 │       ├── relatorios/page.tsx   # Placeholder (fase futura)
@@ -79,14 +86,19 @@ Este documento descreve a estrutura de pastas, o fluxo de autenticação e os m�
 │           │   ├── FormasPagamentoTable.tsx     # Tabela com toggle ativo/inativo (sem delete físico)
 │           │   ├── NovaFormaPagamentoForm.tsx   # Formulário de criação (Client Component, useActionState)
 │           │   └── actions.ts                  # Server Actions: criarFormaPagamento, atualizarFormaPagamento
-│           └── recibo/
-│               ├── page.tsx           # Edição da assinatura usada nos recibos (Server Component, admin-only)
-│               ├── AssinaturaForm.tsx # Formulário (Client Component, useActionState) com upload de assinatura
-│               └── actions.ts         # Server Action atualizarAssinatura() — upload em loja-assets/assinaturas via service_role
+│           ├── recibo/
+│           │   ├── page.tsx           # Edição da assinatura usada nos recibos (Server Component, admin-only)
+│           │   ├── AssinaturaForm.tsx # Formulário (Client Component, useActionState) com upload de assinatura
+│           │   └── actions.ts         # Server Action atualizarAssinatura() — upload em loja-assets/assinaturas via service_role
+│           └── categorias/            # Categorias de movimentação (Entrada/Saída) — Fase 7, admin-only
+│               ├── page.tsx           # Lista (categoria "Mensalidade" é de sistema, não editável)
+│               ├── CategoriasTable.tsx
+│               ├── NovaCategoriaForm.tsx
+│               └── actions.ts         # Server Actions: criarCategoria, atualizarCategoria
 ├── components/
 │   ├── AcessoNegado.tsx          # Mensagem padrão de "sem permissão" para páginas restritas por role
 │   ├── configuracoes/
-│   │   └── ConfigMensalidadeForm.tsx  # Formulário compartilhado entre /configuracoes/mensalidades e /configuracoes/remidos (Client Component)
+│   │   └── ConfigMensalidadeForm.tsx  # Formulário compartilhado pelas seções Normal e Remidos em /configuracoes/mensalidades (Client Component)
 │   └── layout/
 │       ├── Sidebar.tsx           # Navegação lateral fixa (links para os módulos)
 │       └── Header.tsx            # Cabeçalho: nome/role do usuário logado + botão Sair
@@ -110,9 +122,15 @@ Este documento descreve a estrutura de pastas, o fluxo de autenticação e os m�
 │   │   ├── competencias.ts       # proximaCompetenciaAposCadastro(), competenciasFaltantes(), dataVencimento() — SPEC §10 — Fase 6
 │   │   ├── competencias.test.ts  # Testes unitários de cálculo de competências — Fase 6
 │   │   ├── pagamentos.ts         # validarAlocacoes(), calcularNovoStatusMensalidade() — SPEC §11–13 — Fase 6
-│   │   └── pagamentos.test.ts    # Testes unitários de validação de pagamentos — Fase 6
+│   │   ├── pagamentos.test.ts    # Testes unitários de validação de pagamentos — Fase 6
+│   │   └── financeiro.ts         # validarMovimentacao(), validarTransferencia(), calcularSaldoConta(), calcularFechamento(), podeFecharPeriodo(), podeReabrir() — Fase 7
 │   ├── mensalidades/
 │   │   └── recalcular-situacao.ts # recalcularSituacaoMembro() — centraliza sincronização de situação após pagamento/cancelamento — Fase 6
+│   ├── financeiro/               # Fase 7
+│   │   ├── constantes.ts         # CATEGORIA_MENSALIDADE_ID — UUID fixo da categoria de sistema
+│   │   ├── periodo.ts            # periodoEstaFechado() — checagem de fechamento em código de aplicação (usado por pagamentos, movimentações e transferências)
+│   │   ├── fechamento.ts         # obterUltimoFechado(), obterRegistroPeriodo(), cálculo de saldo inicial/totais de um período
+│   │   └── movimentacao-pagamento.ts # criarMovimentacaoPagamento()/cancelarMovimentacaoPagamento() — vínculo entre pagamento de mensalidade e financeiro
 │   └── supabase/
 │       ├── client.ts             # createSupabaseBrowserClient() — uso em Client Components
 │       ├── server.ts             # createSupabaseServerClient() — uso em Server Components/Actions
@@ -126,7 +144,8 @@ Este documento descreve a estrutura de pastas, o fluxo de autenticação e os m�
 │   │   ├── 00000000000016_loja_assets.sql # Fase 4: loja_config.assinatura_url + bucket de Storage loja-assets
 │   │   ├── 00000000000017_loja_config_seed.sql # Fase 4 (fix): garante linha singleton de loja_config
 │   │   ├── 00000000000018_assinaturas_privadas.sql # Fase 4 (fix): bucket privado loja-assinaturas
-│   │   └── 00000000000019_config_mensalidade_append_only.sql # Fase 4 (fix): trigger que bloqueia UPDATE/DELETE em config_mensalidade
+│   │   ├── 00000000000019_config_mensalidade_append_only.sql # Fase 4 (fix): trigger que bloqueia UPDATE/DELETE em config_mensalidade
+│   │   └── 00000000000020_financeiro_fase7.sql # Fase 7: categorias_movimentacao (+ trigger de categoria de sistema), movimentacoes.categoria → categoria_id, trigger de bloqueio de cancelamento em período fechado
 │   └── seed.sql                  # dados de desenvolvimento (formas de pagamento padrão, config inicial da loja)
 ├── docs/
 │   ├── arquitetura.md            # Este arquivo
@@ -201,7 +220,8 @@ Ver `.env.example` na raiz e `docs/instalacao.md` para o passo a passo de config
 - **Fases 2–4 (Configurações):** loja, usuários, mensalidades, remidos, contas, formas de pagamento, recibo.
 - **Fase 5 (Membros):** CRUD de membros, filtros, cálculo de inadimplência centralizado, validações.
 - **Fase 6 (Mensalidades):** geração de competências, registro de pagamento (integral/parcial/múltiplas competências/atrasadas), cancelamento de pagamento, cálculo dinâmico de saldo, recalcular situação de membro (ATIVO/INATIVO), auditoria de pagamentos.
+- **Fase 7 (Financeiro):** categorias de movimentação editáveis (`categorias_movimentacao`, categoria de sistema "Mensalidade" protegida por trigger), lançamentos manuais (Tronco/Recebimentos/Despesas/Custos/Pagamentos avulsos), vínculo automático entre pagamento de mensalidade e movimentação (criado ao registrar, cancelado ao cancelar o pagamento), transferências entre contas, saldo de conta calculado on-the-fly (nunca armazenado), fechamento mensal (saldo inicial encadeado ao fechamento anterior, sequência obrigatória, reabertura só pelo Administrador e só no fechamento mais recente). Cancelamento de movimentação/transferência num período fechado é bloqueado tanto em código quanto por trigger de banco (`bloqueia_cancelamento_periodo_fechado`); para pagamentos de mensalidade a checagem é só em código de aplicação (`periodoEstaFechado`), pra não colidir com o fluxo de compensação automática da Fase 6. **Sem testes automatizados nesta fase** — validação combinada com o usuário para ser manual (decisão registrada em 2026-08-12).
 
-## Fora de escopo (Fase 6)
+## Fora de escopo (Fase 7)
 
-Conforme `PROMPT_INICIAL.md`: financeiro, campanhas, Grande Loja, recibos (geração em PDF) e relatórios existem apenas como rotas placeholder na navegação — sem lógica de negócio em andamento, sem tabelas de domínio e sem testes. Essas funcionalidades são para as fases seguintes. Nota: a criação de itens em `repasses_grande_loja_itens` está deliberadamente fora de escopo (decisão registrada na Fase 2) — será implementada conforme o módulo de Grande Loja evoluir (Fase 9).
+Conforme `PROMPT_INICIAL.md`: campanhas, Grande Loja, recibos (geração em PDF) e relatórios existem apenas como rotas placeholder na navegação — sem lógica de negócio em andamento, sem tabelas de domínio e sem testes. Essas funcionalidades são para as fases seguintes. Nota: a criação de itens em `repasses_grande_loja_itens` está deliberadamente fora de escopo (decisão registrada na Fase 2) — será implementada conforme o módulo de Grande Loja evoluir (Fase 9).

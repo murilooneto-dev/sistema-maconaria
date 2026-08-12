@@ -993,8 +993,7 @@ Uma competência não pode existir duas vezes para o mesmo membro, ano e mês.
 
 /configuracoes
 /configuracoes/loja
-/configuracoes/mensalidades
-/configuracoes/remidos
+/configuracoes/mensalidades (inclui configuração de Remidos)
 /configuracoes/contas
 /configuracoes/formas-pagamento
 /configuracoes/usuarios

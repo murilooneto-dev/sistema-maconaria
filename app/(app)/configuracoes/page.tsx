@@ -5,9 +5,9 @@ const SECOES = [
   { titulo: 'Usuários', href: '/configuracoes/usuarios', apenasAdmin: true },
   { titulo: 'Loja', href: '/configuracoes/loja', apenasAdmin: true },
   { titulo: 'Mensalidades', href: '/configuracoes/mensalidades', apenasAdmin: true },
-  { titulo: 'Remidos', href: '/configuracoes/remidos', apenasAdmin: true },
   { titulo: 'Contas', href: '/configuracoes/contas', apenasAdmin: true },
   { titulo: 'Formas de pagamento', href: '/configuracoes/formas-pagamento', apenasAdmin: true },
+  { titulo: 'Categorias de movimentação', href: '/configuracoes/categorias', apenasAdmin: true },
   { titulo: 'Recibo', href: '/configuracoes/recibo', apenasAdmin: true },
 ] as const
 

@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { requireTesoureiro, AuthorizationError } from '@/lib/auth/require-role'
 import { createSupabaseServiceRoleClient } from '@/lib/supabase/service'
 import { registrarAuditoria } from '@/lib/audit'
-import { competenciasFaltantes, proximaCompetenciaAposCadastro, type Competencia } from '@/lib/domain/competencias'
+import { gerarCompetenciasParaMembro } from '@/lib/mensalidades/gerar-competencias-membro'
 
 type ActionState = { error: string } | { success: string } | undefined
 
@@ -25,9 +25,6 @@ export async function gerarMensalidades(
 
   const supabaseAdmin = createSupabaseServiceRoleClient()
 
-  const hoje = new Date()
-  const competenciaAtual: Competencia = { ano: hoje.getUTCFullYear(), mes: hoje.getUTCMonth() + 1 }
-
   const { data: membros, error: membrosError } = await supabaseAdmin
     .from('membros')
     .select('id, remido, data_cadastro')
@@ -39,61 +36,37 @@ export async function gerarMensalidades(
 
   const { data: configNormal } = await supabaseAdmin
     .from('config_mensalidade')
-    .select('valor_mensalidade, valor_grande_loja, valor_loja')
+    .select('id')
     .eq('tipo', 'NORMAL')
-    .order('vigente_desde', { ascending: false })
     .limit(1)
-    .single()
+    .maybeSingle()
 
   const { data: configRemido } = await supabaseAdmin
     .from('config_mensalidade')
-    .select('valor_mensalidade, valor_grande_loja, valor_loja')
+    .select('id')
     .eq('tipo', 'REMIDO')
-    .order('vigente_desde', { ascending: false })
     .limit(1)
-    .single()
+    .maybeSingle()
 
   let totalGeradas = 0
   let membrosSemConfig = 0
 
   for (const membro of membros ?? []) {
-    const config = membro.remido ? configRemido : configNormal
-    if (!config) {
+    const configExiste = membro.remido ? Boolean(configRemido) : Boolean(configNormal)
+    if (!configExiste) {
       membrosSemConfig += 1
       continue
     }
 
-    const primeira = proximaCompetenciaAposCadastro(membro.data_cadastro)
-
-    const { data: existentes } = await supabaseAdmin
-      .from('mensalidades')
-      .select('ano, mes')
-      .eq('membro_id', membro.id)
-
-    const faltantes = competenciasFaltantes(primeira, competenciaAtual, existentes ?? [])
-
-    if (faltantes.length === 0) {
-      continue
-    }
-
-    const novasLinhas = faltantes.map((competencia) => ({
-      membro_id: membro.id,
-      ano: competencia.ano,
-      mes: competencia.mes,
-      valor_devido: config.valor_mensalidade,
-      valor_grande_loja: config.valor_grande_loja,
-      valor_loja: config.valor_loja,
-    }))
-
-    const { error: insertError } = await supabaseAdmin.from('mensalidades').insert(novasLinhas)
-
-    if (insertError) {
+    try {
+      totalGeradas += await gerarCompetenciasParaMembro(supabaseAdmin, membro)
+    } catch (geracaoError) {
       return {
-        error: `Falha ao gerar competências para o membro ${membro.id}: ${insertError.message}`,
+        error: `Falha ao gerar competências para o membro ${membro.id}: ${
+          geracaoError instanceof Error ? geracaoError.message : 'erro desconhecido'
+        }`,
       }
     }
-
-    totalGeradas += novasLinhas.length
   }
 
   try {
