@@ -1,6 +1,6 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { competenciasFaltantes, proximaCompetenciaAposCadastro, type Competencia } from '@/lib/domain/competencias'
+import { competenciasFaltantes, type Competencia } from '@/lib/domain/competencias'
 
 type MembroParaGeracao = {
   id: string
@@ -9,25 +9,33 @@ type MembroParaGeracao = {
 }
 
 /**
- * Gera as competências pendentes de UM membro, do mês seguinte ao cadastro
- * (SPEC §10) até dezembro do ano corrente — inclui competências futuras
- * ainda não vencidas (decisão confirmada com o usuário em 2026-08-12: "as
- * mensalidades do momento que ele entrou e as FUTURAS, nunca para trás").
+ * Gera as competências pendentes de UM membro, de janeiro a dezembro do ano
+ * corrente — independente da data de cadastro (decisão explícita do
+ * usuário, 2026-08-13: a maioria dos membros cadastrados/importados no
+ * sistema já são membros antigos da Loja sendo digitalizados agora, não
+ * gente entrando hoje, então cobrar só a partir do mês seguinte ao cadastro
+ * — como pedia o SPEC §10 originalmente — deixava o ano incompleto pra
+ * eles). Isso substitui a regra anterior de "mês seguinte ao cadastro"; se
+ * um membro realmente novo entrar no meio do ano, este botão/fluxo também
+ * vai gerar os meses anteriores à entrada dele — aceito conscientemente
+ * pelo usuário como trade-off.
+ *
  * Usa a configuração de mensalidade vigente hoje, gravada como snapshot em
  * cada competência gerada; se a configuração mudar depois, as competências
- * futuras já geradas NÃO são recalculadas (regra de ouro de imutabilidade
- * histórica — trade-off aceito explicitamente pelo usuário). Não gera nada
- * se não houver configuração cadastrada para o tipo do membro (normal/remido),
- * ou se não houver competência pendente (ex: cadastro em dezembro).
+ * já geradas NÃO são recalculadas (regra de ouro de imutabilidade
+ * histórica). Não gera nada se não houver configuração cadastrada para o
+ * tipo do membro (normal/remido).
  *
  * Usada tanto pela geração em lote (`gerarMensalidades`) quanto
- * automaticamente ao cadastrar um membro (`criarMembro`).
+ * automaticamente ao cadastrar um membro (`criarMembro`) e pela importação
+ * via CSV.
  */
 export async function gerarCompetenciasParaMembro(
   supabaseAdmin: SupabaseClient,
   membro: MembroParaGeracao
 ): Promise<number> {
   const hoje = new Date()
+  const primeiroDoAno: Competencia = { ano: hoje.getUTCFullYear(), mes: 1 }
   const fimDoAno: Competencia = { ano: hoje.getUTCFullYear(), mes: 12 }
 
   const { data: config } = await supabaseAdmin
@@ -42,14 +50,12 @@ export async function gerarCompetenciasParaMembro(
     return 0
   }
 
-  const primeira = proximaCompetenciaAposCadastro(membro.data_cadastro)
-
   const { data: existentes } = await supabaseAdmin
     .from('mensalidades')
     .select('ano, mes')
     .eq('membro_id', membro.id)
 
-  const faltantes = competenciasFaltantes(primeira, fimDoAno, existentes ?? [])
+  const faltantes = competenciasFaltantes(primeiroDoAno, fimDoAno, existentes ?? [])
 
   if (faltantes.length === 0) {
     return 0
