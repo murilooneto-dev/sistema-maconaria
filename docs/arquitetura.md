@@ -73,7 +73,15 @@ Este documento descreve a estrutura de pastas, o fluxo de autenticação e os m�
 │       │   ├── actions.ts              # Server Action: gerarRecibo() — a partir de um pagamento (Mensalidade) ou doação (Campanha)
 │       │   ├── [id]/pdf/route.ts       # Route Handler: gera o PDF sob demanda (não fica armazenado em Storage)
 │       │   └── novo/                   # Fluxo de seleção (membro→pagamento ou campanha→doação) + geração
-│       ├── relatorios/page.tsx   # Placeholder (fase futura)
+│       ├── relatorios/                # Módulo Relatórios — Fase 11
+│       │   ├── page.tsx                # Hub de cards (7 relatórios do SPEC §29)
+│       │   ├── ResultadoRelatorioView.tsx # Tabela + resumo + links de export (compartilhado pelos 6 relatórios)
+│       │   ├── membros/                # Resumo de membros — page.tsx + pdf/route.ts + csv/route.ts
+│       │   ├── campanhas/              # Resumo geral OU campanha específica (?campanhaId=) — mesma rota cobre os 2 itens do SPEC
+│       │   ├── financeiro/             # Movimentação de entradas e saídas (filtros: período/tipo/categoria/conta/forma/membro/campanha — SPEC §29)
+│       │   ├── grande-loja/            # Relatório Grande Loja (filtro mês/ano do envio + situação)
+│       │   ├── saldos/                 # Saldos por conta (sem filtros)
+│       │   └── mensalidades/           # Mensalidades / Inadimplência
 │       └── configuracoes/
 │           ├── page.tsx          # Hub de configurações (links para os submódulos, todos habilitados desde a Fase 4)
 │           ├── usuarios/
@@ -147,9 +155,10 @@ Este documento descreve a estrutura de pastas, o fluxo de autenticação e os m�
 │   │   └── recalcular-status.ts  # recalcularStatusCampanha() — EM_ANDAMENTO → CONCLUIDA automático ao atingir a meta (nunca reabre sozinho)
 │   ├── grande-loja/              # Fase 9
 │   │   └── sincronizar-item.ts   # sincronizarItemGrandeLoja() — cria/cancela item de repasse conforme a mensalidade fica QUITADA/deixa de estar; chamada de dentro de registrarPagamento/cancelarPagamento (Fase 6)
-│   ├── pdf/                      # Fase 10
-│   │   ├── recibo.ts             # gerarPdfRecibo() — monta o PDF (pdf-lib): logo, dados, assinatura, cargo fixo "Venerável Mestre", data DD/MM/YYYY
-│   │   └── imagens.ts            # buscarImagemStorage() — baixa logo/assinatura do Storage e devolve bytes prontos para embutir (só PNG/JPEG)
+│   ├── pdf/
+│   │   ├── recibo.ts             # gerarPdfRecibo() — monta o PDF (pdf-lib): cabeçalho logo+nome, tabela de dados, assinatura — Fase 10
+│   │   ├── imagens.ts            # buscarImagemStorage() — baixa logo/assinatura do Storage, identifica PNG/JPEG pelos bytes reais (não pela extensão) — Fase 10
+│   │   └── tabela.ts             # gerarPdfTabela() — PDF tabular genérico e paginado (A4 paisagem), reusado pelos 6 relatórios — Fase 11
 │   ├── financeiro/               # Fase 7
 │   │   ├── constantes.ts         # CATEGORIA_MENSALIDADE_ID, CATEGORIA_CAMPANHA_ID, CATEGORIA_GRANDE_LOJA_ID — UUIDs fixos das categorias de sistema
 │   │   ├── periodo.ts            # periodoEstaFechado() — checagem de fechamento em código de aplicação (usado por pagamentos, movimentações e transferências)
@@ -158,6 +167,16 @@ Este documento descreve a estrutura de pastas, o fluxo de autenticação e os m�
 │   │   ├── movimentacao-doacao.ts    # criarMovimentacaoDoacao()/cancelarMovimentacaoDoacao() — vínculo entre doação e financeiro — Fase 8
 │   │   └── movimentacao-repasse.ts   # criarMovimentacaoRepasse()/cancelarMovimentacaoRepasse() — vínculo entre repasse à Grande Loja (SAIDA) e financeiro — Fase 9
 │   ├── format.ts                 # formatarDataBR() — formata date do Postgres (YYYY-MM-DD) para DD/MM/YYYY — Fase 9
+│   ├── csv.ts                    # gerarCsv() — CSV genérico (separador `;`, BOM UTF-8) para exportação "Excel" — Fase 11
+│   ├── relatorios/               # Fase 11 — cada arquivo é a ÚNICA fonte de dados usada pela tela e pelos exports PDF/CSV do relatório
+│   │   ├── tipos.ts              # ResultadoRelatorio — formato comum (titulo, resumo, colunas, linhas)
+│   │   ├── query.ts              # paramsParaQueryString() — preserva os filtros da tela nos links de export
+│   │   ├── membros.ts            # buscarRelatorioMembros()
+│   │   ├── campanhas.ts          # buscarRelatorioCampanhas() — geral OU específica (SPEC §29 itens 2 e 3), conforme campanhaId
+│   │   ├── financeiro.ts         # buscarRelatorioFinanceiro() — movimentação de entradas e saídas com os 7 filtros do SPEC §29
+│   │   ├── grande-loja.ts        # buscarRelatorioGrandeLoja()
+│   │   ├── saldos.ts             # buscarRelatorioSaldos() — reusa calcularSaldoConta() da Fase 7
+│   │   └── mensalidades.ts       # buscarRelatorioMensalidades() — reusa contarCompetenciasVencidasNaoPagas() da Fase 5/6
 │   └── supabase/
 │       ├── client.ts             # createSupabaseBrowserClient() — uso em Client Components
 │       ├── server.ts             # createSupabaseServerClient() — uso em Server Components/Actions
@@ -257,6 +276,8 @@ Ver `.env.example` na raiz e `docs/instalacao.md` para o passo a passo de config
 
 - **Fase 10 (Recibos):** geração de recibo (Mensalidade a partir de um pagamento ATIVO, Campanha a partir de uma doação ATIVA) com PDF gerado sob demanda via Route Handler (`/recibos/[id]/pdf`, `pdf-lib`) — não armazenado em Storage, recriado a cada download a partir dos dados gravados em `recibos` e da assinatura/logo vigentes na época (a `assinatura_url` é congelada no momento da geração, preservando o histórico mesmo que a assinatura configurada mude depois). Cargo fixo "Venerável Mestre", data em DD/MM/YYYY (`formatarDataBR`). Sem edição/exclusão de recibo (só `INSERT`/`SELECT` no banco — reemitir uma segunda via cria um novo registro). **Sem testes automatizados**, mesmo padrão das Fases 7–9.
 
-## Fora de escopo (Fase 10)
+- **Fase 11 (Relatórios):** os 7 relatórios do SPEC §29 (membros, campanhas geral, campanha específica, financeiro, Grande Loja, saldos por conta, mensalidades/inadimplência), cada um com tela + export PDF (`gerarPdfTabela`, tabular genérico e paginado) + export "Excel" (CSV com separador `;` e BOM UTF-8, `gerarCsv`) — decisão técnica: CSV em vez de `.xlsx` real para não adicionar uma dependência pesada (`xlsx`/`exceljs`) nesta fase; Excel abre `.csv` nativamente. Cada relatório tem um único módulo em `lib/relatorios/` que busca os dados uma vez e alimenta tela, PDF e CSV — evita divergência entre o que a tela mostra e o que é exportado. Resumo geral e campanha específica são a mesma rota (`/relatorios/campanhas`), alternando pelo parâmetro `campanhaId`. **Sem testes automatizados**, mesmo padrão das Fases 7–10.
 
-Conforme `PROMPT_INICIAL.md`: relatórios (incluindo exportação PDF/Excel do relatório Grande Loja e demais relatórios do SPEC §29) existem apenas como rota placeholder — sem lógica de negócio em andamento, sem tabelas de domínio e sem testes. Fica para a Fase 11.
+## Fora de escopo (Fase 11)
+
+Conforme `PROMPT_INICIAL.md`: Fase 12 (Dashboard com dados reais), Fase 13 (revisão de segurança) e Fase 14 (testes) ainda não foram feitas.
