@@ -36,6 +36,10 @@ Este documento descreve a estrutura de pastas, o fluxo de autenticação e os m�
 │       │   ├── novo/
 │       │   │   ├── page.tsx           # Formulário de criação (Server Component, admin-only) — Fase 5
 │       │   │   └── NovoMembroForm.tsx # Formulário (Client Component, useActionState) — Fase 5
+│       │   ├── importar/              # Importação em lote via CSV (admin-only)
+│       │   │   ├── page.tsx           # Instruções de formato + formulário
+│       │   │   ├── ImportarCsvForm.tsx # Upload + resumo (criados/duplicados/inválidos) (Client Component)
+│       │   │   └── actions.ts         # Server Action: importarMembros() — mesma validação e geração de competências de criarMembro
 │       │   └── [id]/
 │       │       ├── page.tsx           # Detalhe de membro (Server Component, leitura liberada a todo autenticado; botão Editar só para admin) — Fase 5
 │       │       └── MembroDetalhe.tsx  # Detalhe + edição inline (Client Component, useState/useTransition) — Fase 5
@@ -138,6 +142,7 @@ Este documento descreve a estrutura de pastas, o fluxo de autenticação e os m�
 │   │   ├── usuarios.ts           # validarNovoUsuario(), validarEdicaoUsuario()
 │   │   ├── usuarios.test.ts      # Testes unitários de validação de usuário
 │   │   ├── membros.ts            # validarMembro() — Fase 5
+│   │   ├── membros-import.ts     # parseCsvMembros() — parse + validação de CSV de importação em lote (reusa validarMembro por linha)
 │   │   ├── membros.test.ts       # Testes unitários de validação de membros — Fase 5
 │   │   ├── inadimplencia.ts      # calcularSituacaoMembro(), contarCompetenciasVencidasNaoPagas() — centraliza regra de 6+ competências vencidas — Fases 5–6
 │   │   ├── inadimplencia.test.ts # Testes unitários de cálculo de inadimplência — Fases 5–6
