@@ -11,6 +11,8 @@ import {
   type AlocacaoCompetencia,
 } from '@/lib/domain/pagamentos'
 import { recalcularSituacaoMembro } from '@/lib/mensalidades/recalcular-situacao'
+import { criarMovimentacaoPagamento, cancelarMovimentacaoPagamento } from '@/lib/financeiro/movimentacao-pagamento'
+import { periodoEstaFechado } from '@/lib/financeiro/periodo'
 
 type ActionState = { error: string } | { success: string } | undefined
 
@@ -337,6 +339,37 @@ export async function registrarPagamento(
     })
   }
 
+  // Vínculo com o financeiro (Fase 7): só cria a movimentação depois que
+  // todas as alocações foram aplicadas com sucesso, pra nunca precisar
+  // compensar a própria movimentação — se falhar aqui, compensa o
+  // pagamento inteiro do mesmo jeito que uma falha no meio do loop.
+  const movimentacaoResult = await criarMovimentacaoPagamento(supabaseAdmin, {
+    pagamentoId: pagamento.id,
+    membroId,
+    contaId,
+    formaPagamentoId,
+    valor: valorTotal,
+    data: dataPagamento,
+    usuarioId: usuario.id,
+  })
+
+  if (movimentacaoResult.error) {
+    const falhasDeReversao = await compensarFalhaParcial(
+      supabaseAdmin,
+      pagamento.id,
+      aplicadasComSucesso,
+      usuario.id
+    )
+    if (falhasDeReversao.length > 0) {
+      return {
+        error: `Falha ao registrar movimentação financeira. O pagamento foi cancelado, mas ${falhasDeReversao.length} competência(s) podem precisar de conferência manual (contate o suporte com o ID do pagamento: ${pagamento.id}).`,
+      }
+    }
+    return {
+      error: `Falha ao registrar movimentação financeira: ${movimentacaoResult.error}. O pagamento foi cancelado automaticamente.`,
+    }
+  }
+
   await recalcularSituacaoMembro(supabaseAdmin, membroId)
 
   try {
@@ -375,7 +408,7 @@ export async function cancelarPagamento(pagamentoId: string, motivo: string): Pr
 
   const { data: pagamento, error: pagamentoError } = await supabaseAdmin
     .from('pagamentos')
-    .select('id, membro_id, status')
+    .select('id, membro_id, status, data_pagamento')
     .eq('id', pagamentoId)
     .single()
 
@@ -385,6 +418,10 @@ export async function cancelarPagamento(pagamentoId: string, motivo: string): Pr
 
   if (pagamento.status === 'CANCELADO') {
     return { error: 'Este pagamento já está cancelado.' }
+  }
+
+  if (await periodoEstaFechado(supabaseAdmin, pagamento.data_pagamento)) {
+    return { error: 'Não é possível cancelar: o período deste pagamento já está fechado.' }
   }
 
   // C1: reivindica o cancelamento atomicamente ANTES de reverter qualquer
@@ -489,6 +526,18 @@ export async function cancelarPagamento(pagamentoId: string, motivo: string): Pr
         error: `O cancelamento do pagamento foi efetivado, mas a reversão de valores está incompleta (falha ao reverter a competência ${vinculo.mensalidade_id}). Contate o suporte para conferência manual do pagamento ${pagamentoId}.`,
       }
     }
+  }
+
+  const movimentacaoResult = await cancelarMovimentacaoPagamento(
+    supabaseAdmin,
+    pagamentoId,
+    motivo.trim(),
+    usuario.id
+  )
+  if (movimentacaoResult.error) {
+    console.error(
+      `Falha ao cancelar a movimentação vinculada ao pagamento ${pagamentoId}: ${movimentacaoResult.error}. Requer conferência manual.`
+    )
   }
 
   await recalcularSituacaoMembro(supabaseAdmin, pagamento.membro_id)

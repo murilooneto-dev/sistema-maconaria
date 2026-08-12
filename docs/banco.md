@@ -490,7 +490,7 @@ A soma de `pagamento_mensalidades.valor_aplicado` para uma dada `mensalidade_id`
 | `id` | `uuid` | Sim | `gen_random_uuid()` | PK. |
 | `data` | `date` | Sim | — | — |
 | `tipo` | `text` | Sim | — | `'ENTRADA'` ou `'SAIDA'` (check). |
-| `categoria` | `text` | Sim | — | Texto livre (categorização de despesa/receita, SPEC §17). |
+| `categoria_id` | `uuid` | Sim | — | FK → `categorias_movimentacao(id)` — desde `00000000000020_financeiro_fase7.sql` (era `categoria text` livre até então; a tabela nunca tinha sido populada, então a normalização para FK foi segura mesmo em produção). |
 | `descricao` | `text` | Não | — | — |
 | `valor` | `numeric(12,2)` | Sim | — | `> 0`. |
 | `conta_id` | `uuid` | Sim | — | FK → `contas(id)`. |
@@ -498,7 +498,7 @@ A soma de `pagamento_mensalidades.valor_aplicado` para uma dada `mensalidade_id`
 | `membro_id` | `uuid` | Não | — | FK → `membros(id)`, opcional. |
 | `campanha_id` | `uuid` | Não | — | FK → `campanhas(id)`, opcional. |
 | `usuario_id` | `uuid` | Sim | — | FK → `profiles(id)`. |
-| `origem` | `text` | Sim | — | Texto livre identificando a origem do lançamento (ex.: `'MANUAL'`, `'PAGAMENTO'`, `'DOACAO'`) — não é enum fechado nesta migration. |
+| `origem` | `text` | Sim | — | Texto livre identificando a origem do lançamento — não é enum fechado no banco. Valores usados pela aplicação desde a Fase 7: `'MANUAL'` (lançamento manual em `/financeiro/nova`) e `'MENSALIDADE'` (gerado automaticamente ao registrar um pagamento de mensalidade; cancelamento só é permitido via tela de Mensalidades, nunca diretamente em `/financeiro`). |
 | `pagamento_id` | `uuid` | Não | — | FK → `pagamentos(id)`, preenchida quando a movimentação foi gerada por um pagamento de mensalidade. |
 | `doacao_id` | `uuid` | Não | — | FK → `doacoes(id)`, preenchida quando gerada por uma doação. |
 | `status` | `text` | Sim | `'ATIVO'` | `'ATIVO'` ou `'CANCELADO'` (check). |
@@ -508,7 +508,7 @@ A soma de `pagamento_mensalidades.valor_aplicado` para uma dada `mensalidade_id`
 
 ### Índices
 
-- `movimentacoes_data_idx`, `movimentacoes_tipo_idx`, `movimentacoes_conta_idx`, `movimentacoes_campanha_idx`, `movimentacoes_status_idx`.
+- `movimentacoes_data_idx`, `movimentacoes_tipo_idx`, `movimentacoes_conta_idx`, `movimentacoes_campanha_idx`, `movimentacoes_status_idx`, `movimentacoes_categoria_idx` (desde `00000000000020_financeiro_fase7.sql`).
 
 ### Constraints
 
@@ -523,7 +523,8 @@ A soma de `pagamento_mensalidades.valor_aplicado` para uma dada `mensalidade_id`
 
 ### Triggers
 
-`movimentacoes_set_updated_at` (BEFORE UPDATE) → `public.set_updated_at()`.
+- `movimentacoes_set_updated_at` (BEFORE UPDATE) → `public.set_updated_at()`.
+- `movimentacoes_bloqueia_cancelamento_fechado` (BEFORE UPDATE, desde `00000000000020_financeiro_fase7.sql`) → `public.bloqueia_cancelamento_periodo_fechado()`: rejeita a transição para `status = 'CANCELADO'` se o mês de `data` já tiver um `fechamentos_mensais` com `status = 'FECHADO'`. Criação de lançamento novo com data retroativa dentro de um mês fechado continua permitida — só o cancelamento é bloqueado (decisão do usuário, 2026-08-12).
 
 ---
 
@@ -566,7 +567,41 @@ A soma de `pagamento_mensalidades.valor_aplicado` para uma dada `mensalidade_id`
 
 ### Triggers
 
-`transferencias_set_updated_at` (BEFORE UPDATE) → `public.set_updated_at()`.
+- `transferencias_set_updated_at` (BEFORE UPDATE) → `public.set_updated_at()`.
+- `transferencias_bloqueia_cancelamento_fechado` (BEFORE UPDATE, desde `00000000000020_financeiro_fase7.sql`) → `public.bloqueia_cancelamento_periodo_fechado()`: mesma regra de `movimentacoes` — cancelamento bloqueado se o mês de `data` já estiver `FECHADO`.
+
+---
+
+## Tabela: `categorias_movimentacao`
+
+**Namespace:** `public.categorias_movimentacao` · **Migration:** `00000000000020_financeiro_fase7.sql`
+
+**Responsabilidade:** Catálogo editável de categorias de `movimentacoes` (Fase 7) — cadastro em `/configuracoes/categorias`, mesmo padrão de `formas_pagamento`.
+
+### Campos
+
+| Campo | Tipo | NOT NULL | Padrão | Descrição |
+|-------|------|----------|--------|-----------|
+| `id` | `uuid` | Sim | `gen_random_uuid()` | PK. |
+| `nome` | `text` | Sim | — | — |
+| `tipo` | `text` | Sim | — | `'ENTRADA'` ou `'SAIDA'` (check). |
+| `sistema` | `boolean` | Sim | `false` | `true` só para a categoria "Mensalidade" (seed, UUID fixo `00000000-0000-0000-0000-000000000001`) — usada exclusivamente pelo vínculo automático de pagamento de mensalidade; nunca editável/removível pela UI nem pelo banco (ver Triggers). |
+| `ativo` | `boolean` | Sim | `true` | — |
+| `created_at` / `updated_at` | `timestamptz` | Sim | `now()` | — |
+
+### Constraints
+
+- **Unique `categorias_movimentacao_nome_tipo_key`:** `(nome, tipo)`.
+
+### RLS
+
+- `categorias_movimentacao_select_authenticated` (SELECT, `authenticated`, `true`).
+- `categorias_movimentacao_write_admin` (ALL, `authenticated`, `public.is_admin()`) — só Administrador cadastra/edita categorias (mesmo padrão de `formas_pagamento`/`contas`).
+
+### Triggers
+
+- `categorias_movimentacao_set_updated_at` (BEFORE UPDATE) → `public.set_updated_at()`.
+- `categorias_movimentacao_no_update_sistema` / `categorias_movimentacao_no_delete_sistema` (BEFORE UPDATE/DELETE, `when (old.sistema)`) → `public.categorias_movimentacao_bloqueia_sistema()`: lança exceção sempre, mesmo padrão do append-only de `config_mensalidade` (Fase 4) — garante a proteção mesmo contra `service_role`, que ignora RLS.
 
 ---
 
@@ -645,7 +680,7 @@ A soma de `pagamento_mensalidades.valor_aplicado` para uma dada `mensalidade_id`
 
 ### Limitação conhecida: bloqueio de período não é imposto pelo banco
 
-SPEC §22 pede para "bloquear alterações normais daquele período" quando um mês está `FECHADO`. A Fase 2 **não** implementa esse bloqueio no banco: não há trigger impedindo o INSERT de uma `movimentacao` ou `pagamento` com `data`/`data_pagamento` dentro de um mês já `FECHADO`. Essa validação fica deferida para a camada de aplicação na Fase 7 (Financeiro), que deve checar o `status` do `fechamentos_mensais` correspondente antes de gravar lançamentos retroativos.
+SPEC §22 pede para "bloquear alterações normais daquele período" quando um mês está `FECHADO`. Implementado na Fase 7 com uma decisão explícita do usuário (2026-08-12): **criação** de lançamento novo (movimentação, transferência ou pagamento de mensalidade) com data retroativa dentro de um mês fechado continua permitida; só **cancelamento** é bloqueado. Para `movimentacoes`/`transferencias` isso é garantido por trigger de banco (`bloqueia_cancelamento_periodo_fechado`, ver tabelas acima), robusto mesmo contra `service_role`. Para `pagamentos`, a checagem é feita em código de aplicação (`periodoEstaFechado()` em `lib/financeiro/periodo.ts`, chamada no início de `cancelarPagamento`) em vez de trigger de banco — para não colidir com o fluxo de compensação automática já existente na Fase 6 (`compensarFalhaParcial`), que também cancela o pagamento internamente em caso de falha parcial no registro.
 
 ### RLS
 
@@ -843,6 +878,7 @@ Migrations SQL são versionadas numericamente sob `supabase/migrations/`:
 - `00000000000017_loja_config_seed.sql` — Fase 4, revisão do review final: garante via `insert ... on conflict do nothing` que a linha singleton `loja_config(id=1)` sempre existe (o seed com esses dados é dev-only, não aplicado em produção); também aplica `file_size_limit`/`allowed_mime_types` ao bucket `loja-assets`.
 - `00000000000018_assinaturas_privadas.sql` — Fase 4, revisão: cria o bucket privado `loja-assinaturas` (`public: false`) para a assinatura de recibo, que passa a não usar mais `loja-assets` (correção de vazamento — a assinatura autentica documentos financeiros e não deveria ser publicamente legível como o logo).
 - `00000000000019_config_mensalidade_append_only.sql` — Fase 4, revisão: adiciona triggers `BEFORE UPDATE`/`BEFORE DELETE` em `config_mensalidade` que sempre lançam exceção, garantindo o append-only mesmo para escritas via `service_role` (que ignora RLS).
+- `00000000000020_financeiro_fase7.sql` — Fase 7: cria `categorias_movimentacao` (com trigger que protege a categoria de sistema "Mensalidade"), troca `movimentacoes.categoria` (texto livre) por `categoria_id` (FK), e adiciona o trigger `bloqueia_cancelamento_periodo_fechado` em `movimentacoes`/`transferencias`.
 
 `supabase/seed.sql` (não numerado, não é migration) contém dados de desenvolvimento: formas de pagamento padrão e a linha singleton de `loja_config`. Não é aplicado automaticamente em produção.
 
