@@ -502,9 +502,10 @@ A soma de `pagamento_mensalidades.valor_aplicado` para uma dada `mensalidade_id`
 | `membro_id` | `uuid` | Não | — | FK → `membros(id)`, opcional. |
 | `campanha_id` | `uuid` | Não | — | FK → `campanhas(id)`, opcional. |
 | `usuario_id` | `uuid` | Sim | — | FK → `profiles(id)`. |
-| `origem` | `text` | Sim | — | Texto livre identificando a origem do lançamento — não é enum fechado no banco. Valores usados pela aplicação: `'MANUAL'` (lançamento manual em `/financeiro/nova`, Fase 7), `'MENSALIDADE'` (gerado automaticamente ao registrar um pagamento de mensalidade; cancelamento só via tela de Mensalidades, Fase 7) e `'CAMPANHA'` (gerado automaticamente ao registrar uma doação; cancelamento só via tela da campanha, Fase 8). |
+| `origem` | `text` | Sim | — | Texto livre identificando a origem do lançamento — não é enum fechado no banco. Valores usados pela aplicação: `'MANUAL'` (lançamento manual em `/financeiro/nova`, Fase 7), `'MENSALIDADE'` (gerado automaticamente ao registrar um pagamento de mensalidade; cancelamento só via tela de Mensalidades, Fase 7), `'CAMPANHA'` (gerado automaticamente ao registrar uma doação; cancelamento só via tela da campanha, Fase 8) e `'GRANDE_LOJA'` (gerado automaticamente ao marcar um repasse como enviado; cancelamento só via tela `/grande-loja`, Fase 9). |
 | `pagamento_id` | `uuid` | Não | — | FK → `pagamentos(id)`, preenchida quando a movimentação foi gerada por um pagamento de mensalidade. |
 | `doacao_id` | `uuid` | Não | — | FK → `doacoes(id)`, preenchida quando gerada por uma doação. |
+| `repasse_grande_loja_id` | `uuid` | Não | — | FK → `repasses_grande_loja(id)`, desde `00000000000022_grande_loja_fase9.sql` — preenchida quando a movimentação (SAIDA) foi gerada por um repasse à Grande Loja. |
 | `status` | `text` | Sim | `'ATIVO'` | `'ATIVO'` ou `'CANCELADO'` (check). |
 | `motivo_cancelamento` / `cancelado_por` / `cancelado_em` | — | Não | — | Padrão par-ou-nada. |
 | `observacao` | `text` | Não | — | — |
@@ -589,7 +590,7 @@ A soma de `pagamento_mensalidades.valor_aplicado` para uma dada `mensalidade_id`
 | `id` | `uuid` | Sim | `gen_random_uuid()` | PK. |
 | `nome` | `text` | Sim | — | — |
 | `tipo` | `text` | Sim | — | `'ENTRADA'` ou `'SAIDA'` (check). |
-| `sistema` | `boolean` | Sim | `false` | `true` para as categorias "Mensalidade" (UUID fixo `00000000-0000-0000-0000-000000000001`, Fase 7) e "Campanha" (UUID fixo `00000000-0000-0000-0000-000000000002`, seed de `00000000000021_campanhas_fase8.sql`) — usadas exclusivamente pelos vínculos automáticos de pagamento de mensalidade e doação; nunca editáveis/removíveis pela UI nem pelo banco (ver Triggers). |
+| `sistema` | `boolean` | Sim | `false` | `true` para as categorias "Mensalidade" (UUID fixo `...0001`, Fase 7), "Campanha" (UUID fixo `...0002`, Fase 8) e "Grande Loja" (UUID fixo `...0003`, seed de `00000000000022_grande_loja_fase9.sql`) — usadas exclusivamente pelos vínculos automáticos de pagamento de mensalidade, doação e repasse; nunca editáveis/removíveis pela UI nem pelo banco (ver Triggers). |
 | `ativo` | `boolean` | Sim | `true` | — |
 | `created_at` / `updated_at` | `timestamptz` | Sim | `now()` | — |
 
@@ -722,6 +723,7 @@ SPEC §22 pede para "bloquear alterações normais daquele período" quando um m
 | `valor_total` | `numeric(12,2)` | Sim | — | `>= 0`. |
 | `observacao` | `text` | Não | — | — |
 | `status` | `text` | Sim | `'ENVIADO'` | `'ENVIADO'` ou `'CANCELADO'` (check). |
+| `conta_id` | `uuid` | Sim | — | FK → `contas(id)` — desde `00000000000022_grande_loja_fase9.sql`. Conta de onde o valor efetivamente sai (decisão do usuário, 2026-08-12: o repasse gera uma `movimentacoes` SAIDA real, debitando essa conta). |
 | `created_at` / `updated_at` | `timestamptz` | Sim | `now()` | — |
 
 ### RLS
@@ -730,6 +732,8 @@ SPEC §22 pede para "bloquear alterações normais daquele período" quando um m
 - `repasses_write_tesoureiro_insert` / `repasses_write_tesoureiro_update` (INSERT/UPDATE, `authenticated`, `public.is_tesoureiro()`) — desde `00000000000015_fase2_correcoes.sql`, sem policy de DELETE.
 
 **Por quê:** SPEC §15/§16 — registrar o envio à Grande Loja é operação financeira de rotina do Tesoureiro, com rastreabilidade de quem/quando (CLAUDE.md §4).
+
+**Fase 9:** ao marcar como enviado, cria uma `movimentacoes` (SAIDA, categoria de sistema "Grande Loja", `repasse_grande_loja_id` preenchido) no valor total do repasse — o dinheiro de Grande Loja acumulado no saldo da Loja passa a sair de fato do caixa nesse momento (não na quitação da mensalidade, que só registra a ENTRADA do total). Cancelar o repasse cancela a movimentação vinculada e reabre os itens (voltam a `PENDENTE`, `repasse_id = null`).
 
 ### Triggers
 
@@ -757,7 +761,7 @@ SPEC §22 pede para "bloquear alterações normais daquele período" quando um m
 ### Índices e constraints
 
 - `repasses_itens_repasse_idx`, `repasses_itens_status_idx`.
-- **Check `repasses_itens_repasse_status_check`:** ou `repasse_id is null` e `status = 'PENDENTE'`, ou `repasse_id is not null` e `status in ('ENVIADO', 'CANCELADO')` — um item só pertence a um repasse enviado depois de deixar de estar pendente, e vice-versa.
+- **Check `repasses_itens_repasse_status_check`** (redefinida por `00000000000015_fase2_correcoes.sql`): ou `repasse_id is null` e `status in ('PENDENTE', 'CANCELADO')`, ou `repasse_id is not null` e `status in ('ENVIADO', 'CANCELADO')` — um item cancelado antes de entrar num repasse fica `CANCELADO` sem nunca ter tido `repasse_id`.
 
 ### RLS
 
@@ -768,7 +772,9 @@ SPEC §22 pede para "bloquear alterações normais daquele período" quando um m
 
 ### Decisão técnica: `repasse_id` nullable é proposital
 
-Diferente de um FK obrigatório, `repasse_id` começa `null` (item `PENDENTE`, ainda não incluído em nenhum envio). A **criação automática** de um item de `repasses_grande_loja_itens` no momento em que uma `mensalidade` é quitada (status → `QUITADA`) é regra de negócio da **Fase 9** (Grande Loja), não desta fase — Fase 2 só cria a estrutura da tabela e a constraint que amarra `status`/`repasse_id`. Até lá, linhas em `repasses_grande_loja_itens` só existem se inseridas manualmente/por seed.
+Diferente de um FK obrigatório, `repasse_id` começa `null` (item `PENDENTE`, ainda não incluído em nenhum envio).
+
+**Implementado na Fase 9** (`sincronizarItemGrandeLoja()`, `lib/grande-loja/sincronizar-item.ts`): a criação/cancelamento automático do item acompanha o status da mensalidade — QUITADA cria (ou reabre, se existia `CANCELADO` sem `repasse_id`) o item `PENDENTE`; deixar de estar QUITADA (pagamento revertido) cancela o item, mas **só enquanto ele ainda está `PENDENTE`**. Um item já `ENVIADO` (dinheiro fisicamente repassado) não é revertido automaticamente se o pagamento original for cancelado depois — limitação conhecida, requer conferência manual pela tela `/grande-loja`. Chamada de dentro de `registrarPagamento`/`cancelarPagamento` (Fase 6), de forma non-fatal (log de erro, não derruba o pagamento).
 
 ### Triggers
 
@@ -884,6 +890,7 @@ Migrations SQL são versionadas numericamente sob `supabase/migrations/`:
 - `00000000000019_config_mensalidade_append_only.sql` — Fase 4, revisão: adiciona triggers `BEFORE UPDATE`/`BEFORE DELETE` em `config_mensalidade` que sempre lançam exceção, garantindo o append-only mesmo para escritas via `service_role` (que ignora RLS).
 - `00000000000020_financeiro_fase7.sql` — Fase 7: cria `categorias_movimentacao` (com trigger que protege a categoria de sistema "Mensalidade"), troca `movimentacoes.categoria` (texto livre) por `categoria_id` (FK), e adiciona o trigger `bloqueia_cancelamento_periodo_fechado` em `movimentacoes`/`transferencias`.
 - `00000000000021_campanhas_fase8.sql` — Fase 8: seed da categoria de sistema "Campanha" (ENTRADA) em `categorias_movimentacao`, usada pelo vínculo automático de doação.
+- `00000000000022_grande_loja_fase9.sql` — Fase 9: `repasses_grande_loja.conta_id` (not null), `movimentacoes.repasse_grande_loja_id`, seed da categoria de sistema "Grande Loja" (SAIDA).
 
 `supabase/seed.sql` (não numerado, não é migration) contém dados de desenvolvimento: formas de pagamento padrão e a linha singleton de `loja_config`. Não é aplicado automaticamente em produção.
 
