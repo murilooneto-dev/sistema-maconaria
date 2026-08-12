@@ -6,6 +6,7 @@ import { requireAdmin, AuthorizationError } from '@/lib/auth/require-role'
 import { createSupabaseServiceRoleClient } from '@/lib/supabase/service'
 import { registrarAuditoria } from '@/lib/audit'
 import { validarMembro } from '@/lib/domain/membros'
+import { gerarCompetenciasParaMembro } from '@/lib/mensalidades/gerar-competencias-membro'
 
 type ActionState = { error: string } | undefined
 
@@ -49,7 +50,7 @@ export async function criarMembro(
   const { data: criado, error } = await supabaseAdmin
     .from('membros')
     .insert(dadosPersistidos)
-    .select('id')
+    .select('id, data_cadastro')
     .single()
 
   if (error || !criado) {
@@ -59,6 +60,22 @@ export async function criarMembro(
     return { error: `Falha ao criar membro: ${error?.message ?? 'erro desconhecido'}` }
   }
 
+  let competenciasGeradas = 0
+  if (doQuadro) {
+    try {
+      competenciasGeradas = await gerarCompetenciasParaMembro(supabaseAdmin, {
+        id: criado.id,
+        remido,
+        data_cadastro: criado.data_cadastro,
+      })
+    } catch (geracaoError) {
+      console.error(
+        `Falha ao gerar competências automaticamente para o membro recém-criado ${criado.id}:`,
+        geracaoError
+      )
+    }
+  }
+
   try {
     await registrarAuditoria({
       usuarioId: admin.id,
@@ -66,14 +83,17 @@ export async function criarMembro(
       acao: 'CRIACAO',
       registroTabela: 'membros',
       registroId: criado.id,
-      dadosNovos: dadosPersistidos,
-      descricao: `Criação do membro ${dadosPersistidos.nome}`,
+      dadosNovos: { ...dadosPersistidos, competenciasGeradas },
+      descricao: `Criação do membro ${dadosPersistidos.nome}${
+        competenciasGeradas > 0 ? ` (${competenciasGeradas} competência(s) gerada(s) automaticamente)` : ''
+      }`,
     })
   } catch (auditError) {
     console.error('Falha ao registrar auditoria (membro criado com sucesso):', auditError)
   }
 
   revalidatePath('/membros')
+  revalidatePath('/mensalidades')
   redirect(`/membros/${criado.id}`)
 }
 
