@@ -96,7 +96,7 @@ async function compensarFalhaParcial(
     }
   }
 
-  await supabaseAdmin
+  const { data: pagamentoCancelado, error: cancelarError } = await supabaseAdmin
     .from('pagamentos')
     .update({
       status: 'CANCELADO',
@@ -106,20 +106,31 @@ async function compensarFalhaParcial(
     })
     .eq('id', pagamentoId)
     .eq('status', 'ATIVO')
+    .select('id')
+    .maybeSingle()
+
+  const cancelamentoConfirmado = !cancelarError && Boolean(pagamentoCancelado)
+  if (!cancelamentoConfirmado) {
+    console.error(
+      `Falha ao cancelar automaticamente o pagamento ${pagamentoId} durante a compensação — requer correção manual.`
+    )
+  }
 
   try {
     await registrarAuditoria({
       usuarioId,
       modulo: 'mensalidades',
-      acao: 'CANCELAMENTO_AUTOMATICO_PARCIAL',
+      acao: cancelamentoConfirmado ? 'CANCELAMENTO_AUTOMATICO_PARCIAL' : 'FALHA_CANCELAMENTO_AUTOMATICO',
       registroTabela: 'pagamentos',
       registroId: pagamentoId,
       dadosNovos: {
+        pagamentoCancelado: cancelamentoConfirmado,
         mensalidadesRevertidas: aplicadas.length - falhasDeReversao.length,
         mensalidadesComFalhaDeReversao: falhasDeReversao,
       },
-      descricao:
-        falhasDeReversao.length > 0
+      descricao: !cancelamentoConfirmado
+        ? `Falha ao cancelar automaticamente o pagamento ${pagamentoId} após erro no registro — requer conferência manual imediata (pagamento pode continuar ATIVO com dados inconsistentes).`
+        : falhasDeReversao.length > 0
           ? `Cancelamento automático do pagamento ${pagamentoId} após falha no registro — ${falhasDeReversao.length} competência(s) não puderam ser revertidas automaticamente e precisam de conferência manual.`
           : `Cancelamento automático do pagamento ${pagamentoId} após falha no registro de todas as competências selecionadas.`,
     })
