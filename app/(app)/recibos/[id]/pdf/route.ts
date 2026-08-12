@@ -32,6 +32,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   ])
 
   const pdfBytes = await gerarPdfRecibo({
+    id: recibo.id,
     tipo: recibo.tipo,
     pessoa: recibo.pessoa,
     valor: Number(recibo.valor),
