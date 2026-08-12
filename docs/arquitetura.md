@@ -2,7 +2,7 @@
 
 ## Overview
 
-Este documento descreve a estrutura de pastas, o fluxo de autenticação e os módulos de negócio implementados nas Fases 1–5 do sistema. Para o schema do banco de dados e políticas de RLS, ver [`docs/banco.md`](./banco.md).
+Este documento descreve a estrutura de pastas, o fluxo de autenticação e os módulos de negócio implementados nas Fases 1–6 do sistema. Para o schema do banco de dados e políticas de RLS, ver [`docs/banco.md`](./banco.md).
 
 ---
 
@@ -38,7 +38,16 @@ Este documento descreve a estrutura de pastas, o fluxo de autenticação e os m�
 │       │   └── [id]/
 │       │       ├── page.tsx           # Detalhe de membro (Server Component, leitura liberada a todo autenticado; botão Editar só para admin) — Fase 5
 │       │       └── MembroDetalhe.tsx  # Detalhe + edição inline (Client Component, useState/useTransition) — Fase 5
-│       ├── mensalidades/page.tsx # Placeholder (Fase 2)
+│       ├── mensalidades/              # Módulo de Mensalidades — Fase 6
+│       │   ├── page.tsx                # Lista de membros com grade mensal de competências e status (Server Component, TESOUREIRO+)
+│       │   ├── actions.ts              # Server Actions: gerarMensalidades(), registrarPagamento(), cancelarPagamento()
+│       │   ├── GerarMensalidadesButton.tsx # Botão para gerar competências (Client Component, admin-only)
+│       │   └── pagamento/
+│       │       ├── page.tsx                # Fluxo de registro de pagamento (Server Component, formulário interativo)
+│       │       ├── actions.ts              # Server Action: registrarPagamentoMensalidade() — único caminho de escrita de pagamentos
+│       │       ├── SelecionarMembro.tsx    # Client Component: dropdown de membros + cálculo dinâmico de saldos
+│       │       ├── PagamentoForm.tsx       # Client Component: seleção de competências + valores + forma de pagamento + conta
+│       │       └── HistoricoPagamentos.tsx # Client Component: tabela de histórico de pagamentos do membro
 │       ├── campanhas/page.tsx    # Placeholder (fase futura)
 │       ├── financeiro/page.tsx   # Placeholder (fase futura)
 │       ├── grande-loja/page.tsx  # Placeholder (fase futura)
@@ -96,8 +105,14 @@ Este documento descreve a estrutura de pastas, o fluxo de autenticação e os m�
 │   │   ├── usuarios.test.ts      # Testes unitários de validação de usuário
 │   │   ├── membros.ts            # validarMembro() — Fase 5
 │   │   ├── membros.test.ts       # Testes unitários de validação de membros — Fase 5
-│   │   ├── inadimplencia.ts      # calcularSituacaoMembro() — centraliza regra de 6+ competências vencidas — Fase 5
-│   │   └── inadimplencia.test.ts # Testes unitários de cálculo de inadimplência — Fase 5
+│   │   ├── inadimplencia.ts      # calcularSituacaoMembro(), contarCompetenciasVencidasNaoPagas() — centraliza regra de 6+ competências vencidas — Fases 5–6
+│   │   ├── inadimplencia.test.ts # Testes unitários de cálculo de inadimplência — Fases 5–6
+│   │   ├── competencias.ts       # proximaCompetenciaAposCadastro(), competenciasFaltantes(), dataVencimento() — SPEC §10 — Fase 6
+│   │   ├── competencias.test.ts  # Testes unitários de cálculo de competências — Fase 6
+│   │   ├── pagamentos.ts         # validarAlocacoes(), calcularNovoStatusMensalidade() — SPEC §11–13 — Fase 6
+│   │   └── pagamentos.test.ts    # Testes unitários de validação de pagamentos — Fase 6
+│   ├── mensalidades/
+│   │   └── recalcular-situacao.ts # recalcularSituacaoMembro() — centraliza sincronização de situação após pagamento/cancelamento — Fase 6
 │   └── supabase/
 │       ├── client.ts             # createSupabaseBrowserClient() — uso em Client Components
 │       ├── server.ts             # createSupabaseServerClient() — uso em Server Components/Actions
@@ -185,7 +200,8 @@ Ver `.env.example` na raiz e `docs/instalacao.md` para o passo a passo de config
 - **Fase 1 (Fundação):** autenticação, profiles, layout autenticado, RLS, Supabase Auth.
 - **Fases 2–4 (Configurações):** loja, usuários, mensalidades, remidos, contas, formas de pagamento, recibo.
 - **Fase 5 (Membros):** CRUD de membros, filtros, cálculo de inadimplência centralizado, validações.
+- **Fase 6 (Mensalidades):** geração de competências, registro de pagamento (integral/parcial/múltiplas competências/atrasadas), cancelamento de pagamento, cálculo dinâmico de saldo, recalcular situação de membro (ATIVO/INATIVO), auditoria de pagamentos.
 
-## Fora de escopo
+## Fora de escopo (Fase 6)
 
-Conforme `PROMPT_INICIAL.md`: mensalidades, financeiro, campanhas, Grande Loja, recibos (geração em PDF) e relatórios existem apenas como rotas placeholder na navegação — sem lógica de negócio em andamento, sem tabelas de domínio e sem testes. Essas funcionalidades são para as fases seguintes.
+Conforme `PROMPT_INICIAL.md`: financeiro, campanhas, Grande Loja, recibos (geração em PDF) e relatórios existem apenas como rotas placeholder na navegação — sem lógica de negócio em andamento, sem tabelas de domínio e sem testes. Essas funcionalidades são para as fases seguintes. Nota: a criação de itens em `repasses_grande_loja_itens` está deliberadamente fora de escopo (decisão registrada na Fase 2) — será implementada conforme o módulo de Grande Loja evoluir (Fase 9).
