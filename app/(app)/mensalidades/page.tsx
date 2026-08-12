@@ -23,7 +23,7 @@ function corStatus(status: string | undefined): string {
 export default async function MensalidadesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ano?: string }>
+  searchParams: Promise<{ ano?: string; nome?: string }>
 }) {
   const params = await searchParams
   const supabase = await createSupabaseServerClient()
@@ -40,11 +40,13 @@ export default async function MensalidadesPage({
 
   const anoSelecionado = params.ano ? Number(params.ano) : new Date().getFullYear()
 
-  const { data: membros } = await supabase
-    .from('membros')
-    .select('id, nome')
-    .eq('do_quadro', true)
-    .order('nome')
+  let queryMembros = supabase.from('membros').select('id, nome').eq('do_quadro', true).order('nome')
+
+  if (params.nome) {
+    queryMembros = queryMembros.ilike('nome', `%${params.nome}%`)
+  }
+
+  const { data: membros } = await queryMembros
 
   const { data: mensalidades, error } = await supabase
     .from('mensalidades')
@@ -81,7 +83,14 @@ export default async function MensalidadesPage({
         </div>
       </div>
 
-      <form className="flex gap-3">
+      <form className="flex flex-wrap gap-3">
+        <input
+          name="nome"
+          type="text"
+          placeholder="Buscar por nome"
+          defaultValue={params.nome ?? ''}
+          className="rounded border border-slate-300 px-3 py-2 text-sm"
+        />
         <select
           name="ano"
           defaultValue={String(anoSelecionado)}
@@ -94,12 +103,14 @@ export default async function MensalidadesPage({
           ))}
         </select>
         <button type="submit" className="rounded border border-slate-300 px-4 py-2 text-sm text-slate-700">
-          Ver ano
+          Filtrar
         </button>
       </form>
 
       {!membros || membros.length === 0 ? (
-        <p className="text-sm text-slate-500">Nenhum membro do quadro cadastrado.</p>
+        <p className="text-sm text-slate-500">
+          {params.nome ? 'Nenhum membro encontrado para essa busca.' : 'Nenhum membro do quadro cadastrado.'}
+        </p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
           <table className="w-full text-sm">
