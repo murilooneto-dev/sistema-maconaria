@@ -13,10 +13,7 @@ describe('validarMembro', () => {
     })
   })
 
-  it('rejeita matrícula vazia', () => {
-    expect(validarMembro({ nome: 'João Silva', matricula: '' })).toEqual({
-      valido: false,
-      erro: 'Informe a matrícula.',
-    })
+  it('aceita matrícula vazia (membro em iniciação)', () => {
+    expect(validarMembro({ nome: 'João Silva', matricula: '' })).toEqual({ valido: true })
   })
 })
