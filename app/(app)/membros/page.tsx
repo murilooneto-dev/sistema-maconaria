@@ -101,6 +101,7 @@ export default async function MembrosPage({
           <option value="">Situação (todas)</option>
           <option value="ATIVO">Ativo</option>
           <option value="INATIVO">Inativo</option>
+          <option value="IRREGULAR">Irregular</option>
         </select>
         <select
           name="do_quadro"
@@ -178,7 +179,15 @@ export default async function MembrosPage({
                   <td className="px-4 py-2">{membro.recolhe ? 'Sim' : 'Não'}</td>
                   <td className="px-4 py-2">{membro.em_iniciacao ? 'Sim' : 'Não'}</td>
                   <td className="px-4 py-2">
-                    <span className={membro.situacao === 'ATIVO' ? 'text-green-700' : 'text-slate-400'}>
+                    <span
+                      className={
+                        membro.situacao === 'ATIVO'
+                          ? 'text-green-700'
+                          : membro.situacao === 'IRREGULAR'
+                            ? 'text-red-700'
+                            : 'text-slate-400'
+                      }
+                    >
                       {membro.situacao}
                     </span>
                   </td>

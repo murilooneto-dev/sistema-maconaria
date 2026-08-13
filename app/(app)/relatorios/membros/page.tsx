@@ -33,6 +33,7 @@ export default async function RelatorioMembrosPage({
             <option value="">Todas</option>
             <option value="ATIVO">Ativo</option>
             <option value="INATIVO">Inativo</option>
+            <option value="IRREGULAR">Irregular</option>
           </select>
         </div>
         <div className="space-y-1">

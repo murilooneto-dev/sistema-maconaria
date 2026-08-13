@@ -18,8 +18,16 @@ describe('calcularSituacaoMembro', () => {
     expect(calcularSituacaoMembro(7)).toBe('INATIVO')
   })
 
-  it('retorna INATIVO com muitas competências vencidas', () => {
-    expect(calcularSituacaoMembro(20)).toBe('INATIVO')
+  it('retorna INATIVO com exatamente 12 competências vencidas (limite)', () => {
+    expect(calcularSituacaoMembro(12)).toBe('INATIVO')
+  })
+
+  it('retorna IRREGULAR com 13 competências vencidas', () => {
+    expect(calcularSituacaoMembro(13)).toBe('IRREGULAR')
+  })
+
+  it('retorna IRREGULAR com muitas competências vencidas', () => {
+    expect(calcularSituacaoMembro(30)).toBe('IRREGULAR')
   })
 })
 
