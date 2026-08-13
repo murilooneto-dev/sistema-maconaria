@@ -24,7 +24,7 @@ export default async function GrandeLojaPage({
 
   const { data: itensPendentes, error } = await supabase
     .from('repasses_grande_loja_itens')
-    .select('id, valor, mensalidades(ano, mes, membros(nome))')
+    .select('id, valor, mensalidades(ano, mes, membro_id, membros(nome))')
     .eq('status', 'PENDENTE')
     .is('repasse_id', null)
     .order('created_at')
