@@ -2,6 +2,7 @@
 
 import { Fragment, useActionState, useMemo, useState, useTransition } from 'react'
 import { marcarComoEnviado, marcarItensComoJaRepassados } from './actions'
+import { abreviarMes } from '@/lib/format'
 
 type Item = {
   id: string
@@ -47,7 +48,7 @@ function agruparPorMembro(itens: Item[]): GrupoMembro[] {
 function competenciasTexto(itens: GrupoMembro['itens']): string {
   const ordenados = [...itens].sort((a, b) => a.ano * 12 + a.mes - (b.ano * 12 + b.mes))
   const anos = new Set(ordenados.map((i) => i.ano))
-  return ordenados.map((i) => (anos.size > 1 ? `${String(i.mes).padStart(2, '0')}/${i.ano}` : String(i.mes).padStart(2, '0'))).join(', ')
+  return ordenados.map((i) => (anos.size > 1 ? `${abreviarMes(i.mes)}/${i.ano}` : abreviarMes(i.mes))).join(', ')
 }
 
 function valorTexto(itens: GrupoMembro['itens']): string {
@@ -110,7 +111,7 @@ function DetalheMembro({ grupo }: { grupo: GrupoMembro }) {
               onChange={() => toggle(item.id)}
             />
             <label htmlFor={`ja-repassado-${item.id}`} className="cursor-pointer">
-              {String(item.mes).padStart(2, '0')}/{item.ano} — R$ {item.valor.toFixed(2)}
+              {abreviarMes(item.mes)}/{item.ano} — R$ {item.valor.toFixed(2)}
             </label>
           </li>
         ))}

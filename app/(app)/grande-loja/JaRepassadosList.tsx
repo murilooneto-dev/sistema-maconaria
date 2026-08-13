@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { reverterItemJaRepassado } from './actions'
+import { abreviarMes } from '@/lib/format'
 
 type Item = {
   id: string
@@ -63,7 +64,7 @@ export function JaRepassadosList({ itens }: { itens: Item[] }) {
               return (
                 <tr key={item.id} className="border-b border-slate-100 last:border-0">
                   <td className="px-2 py-1.5">{membro?.nome ?? '-'}</td>
-                  <td className="px-2 py-1.5">{m ? `${String(m.mes).padStart(2, '0')}/${m.ano}` : '-'}</td>
+                  <td className="px-2 py-1.5">{m ? `${abreviarMes(m.mes)}/${m.ano}` : '-'}</td>
                   <td className="px-2 py-1.5">R$ {Number(item.valor).toFixed(2)}</td>
                   <td className="px-2 py-1.5 text-right">
                     <button
