@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { createSupabaseServiceRoleClient } from '@/lib/supabase/service'
 import { gerarPdfRecibo } from '@/lib/pdf/recibo'
-import { buscarImagemStorage } from '@/lib/pdf/imagens'
+import { buscarImagemStorage, buscarImagemUrl } from '@/lib/pdf/imagens'
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -27,7 +27,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { data: lojaConfig } = await supabaseAdmin.from('loja_config').select('nome, logo_url').eq('id', 1).single()
 
   const [logo, assinatura, assinaturaTesoureiro] = await Promise.all([
-    buscarImagemStorage(supabaseAdmin, 'loja-assets', lojaConfig?.logo_url ?? null),
+    buscarImagemUrl(lojaConfig?.logo_url ?? null),
     buscarImagemStorage(supabaseAdmin, 'loja-assinaturas', recibo.assinatura_url),
     buscarImagemStorage(supabaseAdmin, 'loja-assinaturas', recibo.assinatura_tesoureiro_url),
   ])

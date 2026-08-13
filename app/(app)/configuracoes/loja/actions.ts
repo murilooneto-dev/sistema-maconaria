@@ -19,6 +19,27 @@ function sanitizarNomeArquivo(nome: string): string {
     .replace(/[^a-zA-Z0-9.-]/g, '_') // troca qualquer coisa que não seja letra/número/ponto/hífen por _
 }
 
+/** Extrai o caminho relativo ao bucket a partir da URL pública salva em `logo_url` (ex: "logo/123-arquivo.png"). */
+function extrairCaminhoDoBucket(url: string, bucket: string): string | null {
+  const marcador = `/${bucket}/`
+  const indice = url.indexOf(marcador)
+  return indice === -1 ? null : url.slice(indice + marcador.length)
+}
+
+async function removerArquivoLogoAnterior(
+  supabaseAdmin: ReturnType<typeof createSupabaseServiceRoleClient>,
+  logoUrlAnterior: string | null | undefined
+): Promise<void> {
+  if (!logoUrlAnterior) return
+  const caminho = extrairCaminhoDoBucket(logoUrlAnterior, 'loja-assets')
+  if (!caminho) return
+
+  const { error } = await supabaseAdmin.storage.from('loja-assets').remove([caminho])
+  if (error) {
+    console.error(`Falha ao remover logo anterior ("${caminho}") do Storage:`, error.message)
+  }
+}
+
 export async function atualizarLoja(
   _prevState: ActionState,
   formData: FormData
@@ -80,6 +101,10 @@ export async function atualizarLoja(
     }
   }
 
+  if (logoUrl) {
+    await removerArquivoLogoAnterior(supabaseAdmin, anterior?.logo_url)
+  }
+
   try {
     await registrarAuditoria({
       usuarioId: admin.id,
@@ -96,4 +121,50 @@ export async function atualizarLoja(
 
   revalidatePath('/configuracoes/loja')
   return { success: 'Dados da Loja atualizados com sucesso.' }
+}
+
+export async function removerLogo(_prevState: ActionState): Promise<ActionState> {
+  let admin
+  try {
+    admin = await requireAdmin()
+  } catch (err) {
+    return { error: mensagemAutorizacao(err) }
+  }
+
+  const supabaseAdmin = createSupabaseServiceRoleClient()
+
+  const { data: anterior } = await supabaseAdmin
+    .from('loja_config')
+    .select('nome, logo_url')
+    .eq('id', 1)
+    .single()
+
+  if (!anterior?.logo_url) {
+    return { error: 'A Loja não possui logo cadastrada.' }
+  }
+
+  const { error } = await supabaseAdmin.from('loja_config').update({ logo_url: null }).eq('id', 1)
+
+  if (error) {
+    return { error: `Falha ao remover a logo: ${error.message}` }
+  }
+
+  await removerArquivoLogoAnterior(supabaseAdmin, anterior.logo_url)
+
+  try {
+    await registrarAuditoria({
+      usuarioId: admin.id,
+      modulo: 'configuracoes',
+      acao: 'REMOCAO_LOGO',
+      registroTabela: 'loja_config',
+      dadosAnteriores: anterior,
+      dadosNovos: { logo_url: null },
+      descricao: 'Remoção da logo da Loja',
+    })
+  } catch (auditError) {
+    console.error('Falha ao registrar auditoria (logo removida com sucesso):', auditError)
+  }
+
+  revalidatePath('/configuracoes/loja')
+  return { success: 'Logo removida com sucesso.' }
 }
