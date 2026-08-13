@@ -47,7 +47,7 @@ export function JaRepassadosList({ itens }: { itens: Item[] }) {
         </p>
       )}
 
-      <div className="overflow-x-auto">
+      <div className="max-h-[70vh] overflow-auto">
         <table className="w-full text-sm">
           <thead className="sticky top-0 z-10 border-b border-slate-200 bg-white text-left text-slate-500">
             <tr>

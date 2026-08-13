@@ -178,7 +178,7 @@ export function ItensPendentesForm({
     <form action={formAction} className="space-y-4 rounded-lg border border-slate-200 bg-white p-6">
       <h2 className="text-sm font-semibold text-slate-900">Itens pendentes</h2>
 
-      <div className="overflow-x-auto">
+      <div className="max-h-[70vh] overflow-auto">
         <table className="w-full text-sm">
           <thead className="sticky top-0 z-10 border-b border-slate-200 bg-white text-left text-slate-500">
             <tr>
