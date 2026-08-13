@@ -5,6 +5,7 @@ import { requireTesoureiro, AuthorizationError } from '@/lib/auth/require-role'
 import { createSupabaseServiceRoleClient } from '@/lib/supabase/service'
 import { registrarAuditoria } from '@/lib/audit'
 import { gerarCompetenciasParaMembro } from '@/lib/mensalidades/gerar-competencias-membro'
+import { recalcularSituacaoMembro } from '@/lib/mensalidades/recalcular-situacao'
 
 type ActionState = { error: string } | { success: string } | undefined
 
@@ -25,10 +26,15 @@ export async function gerarMensalidades(
 
   const supabaseAdmin = createSupabaseServiceRoleClient()
 
+  // Membros IRREGULAR (12+ competências vencidas) não recebem competência
+  // nova automaticamente — decisão do usuário (2026-08-13): passam a ficar
+  // fora da geração até se regularizarem (o que os tira de IRREGULAR
+  // sozinho, via recalcularSituacaoMembro logo abaixo).
   const { data: membros, error: membrosError } = await supabaseAdmin
     .from('membros')
     .select('id, remido, data_cadastro')
     .eq('do_quadro', true)
+    .neq('situacao', 'IRREGULAR')
 
   if (membrosError) {
     return { error: `Falha ao buscar membros: ${membrosError.message}` }
@@ -66,6 +72,21 @@ export async function gerarMensalidades(
           geracaoError instanceof Error ? geracaoError.message : 'erro desconhecido'
         }`,
       }
+    }
+  }
+
+  // Ponto periódico de recálculo de situação (ATIVO/INATIVO/IRREGULAR): como
+  // "vencida" depende só da passagem do calendário, um membro que nunca
+  // recebe uma ação de pagamento não teria sua situação reavaliada sozinho.
+  // "Gerar mensalidades" já roda mensalmente por rotina do tesoureiro, então
+  // aproveita esse gatilho pra reavaliar todo mundo do quadro — inclusive
+  // quem já está IRREGULAR, pra poder voltar sozinho se regularizar.
+  const { data: todosDoQuadro } = await supabaseAdmin.from('membros').select('id').eq('do_quadro', true)
+  for (const membro of todosDoQuadro ?? []) {
+    try {
+      await recalcularSituacaoMembro(supabaseAdmin, membro.id)
+    } catch (recalculoError) {
+      console.error(`Falha ao recalcular situação do membro ${membro.id}:`, recalculoError)
     }
   }
 

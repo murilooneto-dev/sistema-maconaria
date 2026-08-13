@@ -1,12 +1,18 @@
 /**
- * Regra de inadimplência (SPEC §7): mais de 6 competências vencidas e não
- * pagas torna o membro INATIVO. Reativação para ATIVO é automática quando
- * o número volta a 6 ou menos. Esta função é pura — quem chama é
- * responsável por contar as competências vencidas (Fase 6, quando
- * mensalidades reais existirem).
+ * Regra de inadimplência (SPEC §7, estendida em 2026-08-13): mais de 6
+ * competências vencidas e não pagas torna o membro INATIVO; mais de 12,
+ * IRREGULAR (degrau mais grave — para de gerar mensalidade nova e sai dos
+ * cálculos de inadimplência/Grande Loja, decisão do usuário). Reativação é
+ * automática nos dois sentidos: o valor recalculado sempre reflete o
+ * número atual de competências vencidas, então regularizar o pagamento
+ * baixa a situação sozinha (IRREGULAR → INATIVO → ATIVO conforme o número
+ * cai). Esta função é pura — quem chama é responsável por contar as
+ * competências vencidas.
  */
-export function calcularSituacaoMembro(competenciasVencidasNaoPagas: number): 'ATIVO' | 'INATIVO' {
-  return competenciasVencidasNaoPagas > 6 ? 'INATIVO' : 'ATIVO'
+export function calcularSituacaoMembro(competenciasVencidasNaoPagas: number): 'ATIVO' | 'INATIVO' | 'IRREGULAR' {
+  if (competenciasVencidasNaoPagas > 12) return 'IRREGULAR'
+  if (competenciasVencidasNaoPagas > 6) return 'INATIVO'
+  return 'ATIVO'
 }
 
 export type CompetenciaSituacao = { ano: number; mes: number }

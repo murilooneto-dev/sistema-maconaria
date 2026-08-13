@@ -33,6 +33,7 @@ export default async function RelatorioMensalidadesPage({
             <option value="">Todas</option>
             <option value="ATIVO">Ativo</option>
             <option value="INATIVO">Inativo</option>
+            <option value="IRREGULAR">Irregular</option>
           </select>
         </div>
         <button type="submit" className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white">

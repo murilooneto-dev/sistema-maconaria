@@ -165,7 +165,11 @@ export function MembroDetalhe({ membro, isAdmin }: { membro: Membro; isAdmin: bo
               <dt className="text-slate-500">Situação</dt>
               <dd
                 className={
-                  membro.situacao === 'ATIVO' ? 'font-medium text-green-700' : 'font-medium text-slate-400'
+                  membro.situacao === 'ATIVO'
+                    ? 'font-medium text-green-700'
+                    : membro.situacao === 'IRREGULAR'
+                      ? 'font-medium text-red-700'
+                      : 'font-medium text-slate-400'
                 }
               >
                 {membro.situacao}
