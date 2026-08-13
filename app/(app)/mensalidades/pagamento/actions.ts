@@ -341,7 +341,7 @@ export async function registrarPagamento(
     })
 
     try {
-      await sincronizarItemGrandeLoja(supabaseAdmin, alocacao.mensalidadeId)
+      await sincronizarItemGrandeLoja(supabaseAdmin, alocacao.mensalidadeId, usuario.id)
     } catch (glError) {
       console.error(
         `Falha ao sincronizar item de Grande Loja da mensalidade ${alocacao.mensalidadeId}:`,
@@ -551,7 +551,7 @@ export async function cancelarPagamento(pagamentoId: string, motivo: string): Pr
     }
 
     try {
-      await sincronizarItemGrandeLoja(supabaseAdmin, vinculo.mensalidade_id)
+      await sincronizarItemGrandeLoja(supabaseAdmin, vinculo.mensalidade_id, usuario.id)
     } catch (glError) {
       console.error(`Falha ao sincronizar item de Grande Loja da mensalidade ${vinculo.mensalidade_id}:`, glError)
     }

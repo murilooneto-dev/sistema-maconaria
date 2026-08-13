@@ -1,8 +1,9 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { AcessoNegado } from '@/components/AcessoNegado'
-import { calcularTotal } from '@/lib/domain/grande-loja'
+import { calcularTotal, MOTIVO_JA_REPASSADO } from '@/lib/domain/grande-loja'
 import { ItensPendentesForm } from './ItensPendentesForm'
 import { HistoricoRepasses } from './HistoricoRepasses'
+import { JaRepassadosList } from './JaRepassadosList'
 
 export default async function GrandeLojaPage({
   searchParams,
@@ -45,6 +46,14 @@ export default async function GrandeLojaPage({
       return membro?.nome
     })
   )
+
+  const { data: itensJaRepassados } = await supabase
+    .from('repasses_grande_loja_itens')
+    .select('id, valor, cancelado_em, mensalidades(ano, mes, membros(nome))')
+    .eq('status', 'CANCELADO')
+    .eq('motivo_cancelamento', MOTIVO_JA_REPASSADO)
+    .is('repasse_id', null)
+    .order('cancelado_em', { ascending: false })
 
   const [contas, formasPagamento] = await Promise.all([
     supabase.from('contas').select('id, nome').eq('ativo', true).order('nome'),
@@ -119,6 +128,10 @@ export default async function GrandeLojaPage({
           contas={contas.data ?? []}
           formasPagamento={formasPagamento.data ?? []}
         />
+      )}
+
+      {podeEditar && (itensJaRepassados ?? []).length > 0 && (
+        <JaRepassadosList itens={itensJaRepassados ?? []} />
       )}
 
       <HistoricoRepasses

@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { requireTesoureiro, AuthorizationError } from '@/lib/auth/require-role'
 import { createSupabaseServiceRoleClient } from '@/lib/supabase/service'
 import { registrarAuditoria } from '@/lib/audit'
-import { calcularTotal, validarSelecaoRepasse } from '@/lib/domain/grande-loja'
+import { calcularTotal, validarSelecaoRepasse, MOTIVO_JA_REPASSADO } from '@/lib/domain/grande-loja'
 import { criarMovimentacaoRepasse, cancelarMovimentacaoRepasse } from '@/lib/financeiro/movimentacao-repasse'
 
 type ActionState = { error: string } | { success: string } | undefined
@@ -126,6 +126,125 @@ export async function marcarComoEnviado(_prevState: ActionState, formData: FormD
   revalidatePath('/grande-loja')
   revalidatePath('/financeiro')
   return { success: 'Repasse registrado com sucesso.' }
+}
+
+/**
+ * Marca itens PENDENTES (sem repasse) como já repassados à Grande Loja fora
+ * do sistema — ex: competência quitada antes do controle atual existir.
+ * Tira o item do cálculo de repasse atual e de qualquer futuro, sem gerar
+ * um repasse de fato (não há movimentação financeira envolvida). Reversível
+ * via `reverterItemJaRepassado`.
+ */
+export async function marcarItensComoJaRepassados(itemIds: string[]): Promise<{ error?: string }> {
+  let usuario
+  try {
+    usuario = await requireTesoureiro()
+  } catch (err) {
+    return { error: mensagemAutorizacao(err) }
+  }
+
+  if (itemIds.length === 0) {
+    return { error: 'Selecione ao menos um mês.' }
+  }
+
+  const supabaseAdmin = createSupabaseServiceRoleClient()
+
+  const { data: atualizados, error } = await supabaseAdmin
+    .from('repasses_grande_loja_itens')
+    .update({
+      status: 'CANCELADO',
+      cancelado_por: usuario.id,
+      cancelado_em: new Date().toISOString(),
+      motivo_cancelamento: MOTIVO_JA_REPASSADO,
+    })
+    .in('id', itemIds)
+    .eq('status', 'PENDENTE')
+    .is('repasse_id', null)
+    .select('id')
+
+  if (error) {
+    return { error: `Falha ao marcar itens como já repassados: ${error.message}` }
+  }
+
+  if (!atualizados || atualizados.length !== itemIds.length) {
+    return {
+      error: 'Um ou mais itens selecionados não estão mais disponíveis (podem já ter sido enviados ou marcados). Atualize a página e tente novamente.',
+    }
+  }
+
+  try {
+    await registrarAuditoria({
+      usuarioId: usuario.id,
+      modulo: 'grande-loja',
+      acao: 'MARCACAO_MANUAL_JA_REPASSADO',
+      registroTabela: 'repasses_grande_loja_itens',
+      dadosNovos: { itens: atualizados.map((i) => i.id) },
+      descricao: `${atualizados.length} item(ns) marcado(s) manualmente como já repassados anteriormente`,
+    })
+  } catch (auditError) {
+    console.error('Falha ao registrar auditoria (itens marcados com sucesso):', auditError)
+  }
+
+  revalidatePath('/grande-loja')
+  return {}
+}
+
+/** Reverte um item marcado manualmente como já repassado, devolvendo-o para PENDENTE (reentra no cálculo). */
+export async function reverterItemJaRepassado(itemId: string): Promise<{ error?: string }> {
+  let usuario
+  try {
+    usuario = await requireTesoureiro()
+  } catch (err) {
+    return { error: mensagemAutorizacao(err) }
+  }
+
+  const supabaseAdmin = createSupabaseServiceRoleClient()
+
+  const { data: item, error: itemError } = await supabaseAdmin
+    .from('repasses_grande_loja_itens')
+    .select('id, mensalidade_id, mensalidades(valor_grande_loja)')
+    .eq('id', itemId)
+    .eq('status', 'CANCELADO')
+    .eq('motivo_cancelamento', MOTIVO_JA_REPASSADO)
+    .is('repasse_id', null)
+    .maybeSingle()
+
+  if (itemError || !item) {
+    return { error: 'Item não encontrado ou não foi marcado manualmente como já repassado.' }
+  }
+
+  const mensalidade = Array.isArray(item.mensalidades) ? item.mensalidades[0] : item.mensalidades
+
+  const { error } = await supabaseAdmin
+    .from('repasses_grande_loja_itens')
+    .update({
+      status: 'PENDENTE',
+      valor: mensalidade?.valor_grande_loja,
+      cancelado_por: null,
+      cancelado_em: null,
+      motivo_cancelamento: null,
+    })
+    .eq('id', itemId)
+
+  if (error) {
+    return { error: `Falha ao reverter item: ${error.message}` }
+  }
+
+  try {
+    await registrarAuditoria({
+      usuarioId: usuario.id,
+      modulo: 'grande-loja',
+      acao: 'REVERSAO_MARCACAO_JA_REPASSADO',
+      registroTabela: 'repasses_grande_loja_itens',
+      registroId: itemId,
+      descricao: 'Reversão de marcação manual de "já repassado" — item volta a compor o cálculo de repasse',
+    })
+  } catch (auditError) {
+    console.error('Falha ao registrar auditoria (item revertido com sucesso):', auditError)
+  }
+
+  revalidatePath('/grande-loja')
+  return {}
 }
 
 export async function cancelarRepasse(repasseId: string): Promise<{ error?: string }> {
