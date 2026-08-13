@@ -2,7 +2,7 @@
 
 import { Fragment, useState, useTransition } from 'react'
 import { cancelarRepasse } from './actions'
-import { formatarDataBR } from '@/lib/format'
+import { formatarDataBR, abreviarMes } from '@/lib/format'
 
 type Repasse = {
   id: string
@@ -42,7 +42,7 @@ function membroDoItem(item: ItemRepasse): string {
 function competenciaDoItem(item: ItemRepasse): string {
   const m = primeiro(item.mensalidades)
   if (!m) return '-'
-  return `${String(m.mes).padStart(2, '0')}/${m.ano}`
+  return `${abreviarMes(m.mes)}/${m.ano}`
 }
 
 export function HistoricoRepasses({

@@ -4,3 +4,10 @@ export function formatarDataBR(dataISO: string): string {
   if (!ano || !mes || !dia) return dataISO
   return `${dia}/${mes}/${ano}`
 }
+
+const MESES_ABREVIADOS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+
+/** Abrevia um mês (1-12) para o formato "Jan", "Fev", etc. */
+export function abreviarMes(mes: number): string {
+  return MESES_ABREVIADOS[mes - 1] ?? String(mes)
+}
