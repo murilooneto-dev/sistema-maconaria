@@ -7,6 +7,7 @@ import { createSupabaseServiceRoleClient } from '@/lib/supabase/service'
 import { registrarAuditoria } from '@/lib/audit'
 import { validarMembro } from '@/lib/domain/membros'
 import { gerarCompetenciasParaMembro } from '@/lib/mensalidades/gerar-competencias-membro'
+import { sincronizarValorMensalidadesPendentes } from '@/lib/mensalidades/sincronizar-valor-remido'
 
 type ActionState = { error: string } | undefined
 
@@ -156,6 +157,18 @@ export async function atualizarMembro(
     return { error: `Falha ao atualizar membro: ${error?.message ?? 'membro não encontrado'}` }
   }
 
+  let mensalidadesAtualizadas = 0
+  if (anterior && anterior.remido !== dados.remido) {
+    try {
+      mensalidadesAtualizadas = await sincronizarValorMensalidadesPendentes(supabaseAdmin, id, dados.remido)
+    } catch (syncError) {
+      console.error(
+        `Falha ao sincronizar valor das mensalidades pendentes do membro ${id} após mudança de remido:`,
+        syncError
+      )
+    }
+  }
+
   try {
     await registrarAuditoria({
       usuarioId: admin.id,
@@ -164,8 +177,12 @@ export async function atualizarMembro(
       registroTabela: 'membros',
       registroId: id,
       dadosAnteriores: anterior ?? null,
-      dadosNovos: dadosPersistidos,
-      descricao: `Edição do membro ${dadosPersistidos.nome}`,
+      dadosNovos: { ...dadosPersistidos, mensalidadesAtualizadas },
+      descricao: `Edição do membro ${dadosPersistidos.nome}${
+        mensalidadesAtualizadas > 0
+          ? ` (${mensalidadesAtualizadas} mensalidade(s) pendente(s) ajustada(s) para o novo valor de ${dados.remido ? 'remido' : 'normal'})`
+          : ''
+      }`,
     })
   } catch (auditError) {
     console.error('Falha ao registrar auditoria (membro atualizado com sucesso):', auditError)
@@ -173,5 +190,6 @@ export async function atualizarMembro(
 
   revalidatePath('/membros')
   revalidatePath(`/membros/${id}`)
+  revalidatePath('/mensalidades')
   return {}
 }
