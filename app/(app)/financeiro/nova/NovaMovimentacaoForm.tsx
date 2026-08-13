@@ -167,6 +167,20 @@ export function NovaMovimentacaoForm({
             className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
           />
         </div>
+
+        <div className="space-y-1 sm:col-span-2">
+          <label htmlFor="anexos" className="text-sm font-medium text-slate-700">
+            Anexos (opcional)
+          </label>
+          <input
+            id="anexos"
+            name="anexos"
+            type="file"
+            multiple
+            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.csv,.xls,.xlsx"
+            className="block w-full text-sm text-slate-700"
+          />
+        </div>
       </div>
 
       {state && 'error' in state && (

@@ -24,6 +24,8 @@ O sistema tem três perfis (`profiles.role`, ver `docs/banco.md`): `ADMINISTRADO
 | Auditoria — leitura | Sim | Não | Não |
 | Usuários — criar / editar / ativar-desativar / redefinir senha | Sim | Não | Não |
 | Usuários — leitura do próprio perfil | Sim | Sim | Sim |
+| Anexos (membro/pagamento/movimentação) — enviar / excluir | Sim | Sim | Não |
+| Anexos — visualizar / baixar | Sim | Sim | Sim |
 
 Notas:
 
@@ -58,6 +60,8 @@ Algumas operações **não podem** ser feitas pelo client normal porque não sã
 Somente depois dessa checagem passar a Server Action instancia `createSupabaseServiceRoleClient()` e executa a operação privilegiada.
 
 `lib/supabase/service.ts` reforça essa fronteira estruturalmente: o módulo importa o pacote `server-only`, que faz o **build falhar** se algum código client-side tentar importá-lo por engano — a `service_role` key nunca chega ao bundle do browser (CLAUDE.md §11, princípio 12 do SPEC).
+
+`lib/auth/require-role.ts` também expõe `requireAutenticado()`, que só exige perfil ativo (qualquer role, incluindo Consulta) — usada por `obterUrlAnexo()` (`app/(app)/anexos/actions.ts`), já que baixar um anexo é leitura, não escrita, e Consulta deve poder ver os mesmos documentos que vê na tela.
 
 ### Onde a Camada 2 se aplica hoje
 

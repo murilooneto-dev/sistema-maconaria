@@ -57,3 +57,14 @@ export async function requireTesoureiro(): Promise<PerfilAtual> {
 
   return perfil as PerfilAtual
 }
+
+/** Lança AuthorizationError se não houver usuário ativo autenticado (qualquer role, incl. CONSULTA). */
+export async function requireAutenticado(): Promise<PerfilAtual> {
+  const perfil = await perfilAtual()
+
+  if (!perfil || !perfil.ativo) {
+    throw new AuthorizationError('Faça login para executar esta ação.')
+  }
+
+  return perfil
+}

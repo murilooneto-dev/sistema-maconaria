@@ -896,6 +896,7 @@ Migrations SQL são versionadas numericamente sob `supabase/migrations/`:
 - `00000000000022_grande_loja_fase9.sql` — Fase 9: `repasses_grande_loja.conta_id` (not null), `movimentacoes.repasse_grande_loja_id`, seed da categoria de sistema "Grande Loja" (SAIDA).
 - `00000000000023_assinatura_tesoureiro.sql` — `loja_config.assinatura_tesoureiro_url` e `recibos.assinatura_tesoureiro_url`, para o recibo em PDF mostrar as assinaturas do Venerável Mestre e do Tesoureiro lado a lado.
 - `00000000000024_membros_em_iniciacao.sql` — `membros.matricula` deixa de ser `NOT NULL` e ganha a coluna `em_iniciacao` (flag informativa).
+- `00000000000025_anexos_e_observacao.sql` — adiciona `membros.observacao` (texto livre); cria a tabela genérica `anexos` (`entidade_tipo` em `MEMBRO`/`PAGAMENTO`/`MOVIMENTACAO` + `entidade_id`, exclusão lógica via `status`) e o bucket privado `anexos` (`public: false`, 10MB, MIME allowlist), usado por membros, pagamentos de mensalidade e lançamentos financeiros manuais. Sem policies de `select`/`insert`/`delete` em `storage.objects` nem na tabela `anexos` — todo acesso passa por Server Actions com `service_role` (mesmo padrão de `auditoria`), e download é sempre via signed URL de 5 minutos gerada sob demanda (`lib/anexos/signed-url.ts`), nunca um link público persistido.
 
 `supabase/seed.sql` (não numerado, não é migration) contém dados de desenvolvimento: formas de pagamento padrão e a linha singleton de `loja_config`. Não é aplicado automaticamente em produção.
 

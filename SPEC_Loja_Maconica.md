@@ -214,6 +214,8 @@ Proteger todas as rotas privadas.
 - Remido
 - Recolhe
 - Situação
+- Observação (texto livre, opcional)
+- Anexos (arquivos: PDF, JPEG, PNG, Word, CSV, XLS/XLSX — múltiplos por membro, ver §11)
 
 ### Regras
 
@@ -379,6 +381,10 @@ Pagamento em agosto:
 R$ 450.
 
 O sistema deverá vincular um único pagamento às três competências.
+
+## Anexos
+
+Ao registrar um pagamento (mensalidade) ou uma movimentação financeira manual (entrada/saída em `Financeiro > Nova movimentação`), o operador pode anexar um ou mais comprovantes (PDF, JPEG, PNG, Word, CSV, XLS/XLSX, até 10MB cada). Falha ao enviar um anexo não impede nem reverte o pagamento/movimentação já registrado — é um dado auxiliar do comprovante, não um dado financeiro crítico (decisão adicionada em 2026-08-13, a pedido do usuário).
 
 ---
 

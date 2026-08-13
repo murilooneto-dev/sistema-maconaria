@@ -48,6 +48,7 @@ export default async function PagamentoPage({
     status: string
     motivo_cancelamento: string | null
   }[] = []
+  let anexosPorPagamento: Record<string, { id: string; nome_arquivo: string; tamanho_bytes: number; criado_em: string }[]> = {}
 
   if (params.membroId) {
     const { data: competenciasData } = await supabase
@@ -65,6 +66,26 @@ export default async function PagamentoPage({
       .eq('membro_id', params.membroId)
       .order('data_pagamento', { ascending: false })
     pagamentos = pagamentosData ?? []
+
+    if (pagamentos.length > 0) {
+      const { data: anexosData } = await supabase
+        .from('anexos')
+        .select('id, nome_arquivo, tamanho_bytes, criado_em, entidade_id')
+        .eq('entidade_tipo', 'PAGAMENTO')
+        .eq('status', 'ATIVO')
+        .in(
+          'entidade_id',
+          pagamentos.map((p) => p.id)
+        )
+        .order('criado_em', { ascending: false })
+
+      anexosPorPagamento = {}
+      for (const anexo of anexosData ?? []) {
+        const lista = anexosPorPagamento[anexo.entidade_id] ?? []
+        lista.push(anexo)
+        anexosPorPagamento[anexo.entidade_id] = lista
+      }
+    }
   }
 
   return (
@@ -79,7 +100,11 @@ export default async function PagamentoPage({
             contas={contas ?? []}
             formasPagamento={formasPagamento ?? []}
           />
-          <HistoricoPagamentos pagamentos={pagamentos} />
+          <HistoricoPagamentos
+            pagamentos={pagamentos}
+            anexosPorPagamento={anexosPorPagamento}
+            podeExcluirAnexo
+          />
         </>
       )}
     </div>

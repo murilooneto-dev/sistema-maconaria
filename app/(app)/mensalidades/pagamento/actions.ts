@@ -14,6 +14,7 @@ import { recalcularSituacaoMembro } from '@/lib/mensalidades/recalcular-situacao
 import { criarMovimentacaoPagamento, cancelarMovimentacaoPagamento } from '@/lib/financeiro/movimentacao-pagamento'
 import { periodoEstaFechado } from '@/lib/financeiro/periodo'
 import { sincronizarItemGrandeLoja } from '@/lib/grande-loja/sincronizar-item'
+import { uploadAnexosDoFormulario } from '@/lib/anexos/upload'
 
 type ActionState = { error: string } | { success: string } | undefined
 
@@ -396,9 +397,21 @@ export async function registrarPagamento(
     console.error('Falha ao registrar auditoria (pagamento registrado com sucesso):', auditError)
   }
 
+  // Anexos são um dado auxiliar do comprovante — falha no upload não desfaz
+  // um pagamento já registrado e confirmado com sucesso, só vira aviso.
+  const { erros: errosAnexos } = await uploadAnexosDoFormulario(supabaseAdmin, formData, 'anexos', {
+    entidadeTipo: 'PAGAMENTO',
+    entidadeId: pagamento.id,
+    enviadoPor: usuario.id,
+  })
+
   revalidatePath('/mensalidades')
   revalidatePath('/mensalidades/pagamento')
   revalidatePath(`/membros/${membroId}`)
+
+  if (errosAnexos.length > 0) {
+    return { success: `Pagamento registrado com sucesso. Falha ao anexar arquivo(s): ${errosAnexos.join(' ')}` }
+  }
   return { success: 'Pagamento registrado com sucesso.' }
 }
 

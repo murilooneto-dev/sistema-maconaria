@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import { cancelarPagamento } from './actions'
+import { AnexosExpandable } from '@/components/anexos/AnexosExpandable'
+import type { AnexoItem } from '@/components/anexos/AnexosList'
 
 type Pagamento = {
   id: string
@@ -11,7 +13,15 @@ type Pagamento = {
   motivo_cancelamento: string | null
 }
 
-export function HistoricoPagamentos({ pagamentos }: { pagamentos: Pagamento[] }) {
+export function HistoricoPagamentos({
+  pagamentos,
+  anexosPorPagamento,
+  podeExcluirAnexo,
+}: {
+  pagamentos: Pagamento[]
+  anexosPorPagamento: Record<string, AnexoItem[]>
+  podeExcluirAnexo: boolean
+}) {
   const [isPending, startTransition] = useTransition()
   const [feedback, setFeedback] = useState<{ id: string; message: string; isError: boolean } | null>(null)
 
@@ -43,6 +53,7 @@ export function HistoricoPagamentos({ pagamentos }: { pagamentos: Pagamento[] })
             <th className="px-4 py-2 font-medium">Data</th>
             <th className="px-4 py-2 font-medium">Valor total</th>
             <th className="px-4 py-2 font-medium">Situação</th>
+            <th className="px-4 py-2 font-medium">Anexos</th>
             <th className="px-4 py-2 font-medium">Ações</th>
           </tr>
         </thead>
@@ -57,6 +68,9 @@ export function HistoricoPagamentos({ pagamentos }: { pagamentos: Pagamento[] })
                 <span className={pagamento.status === 'ATIVO' ? 'text-green-700' : 'text-slate-400'}>
                   {pagamento.status}
                 </span>
+              </td>
+              <td className="px-4 py-2">
+                <AnexosExpandable anexos={anexosPorPagamento[pagamento.id] ?? []} podeExcluir={podeExcluirAnexo} />
               </td>
               <td className="px-4 py-2">
                 {pagamento.status === 'ATIVO' && (

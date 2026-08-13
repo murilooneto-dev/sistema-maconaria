@@ -130,6 +130,20 @@ export function PagamentoForm({
         />
       </div>
 
+      <div className="space-y-1">
+        <label htmlFor="anexos" className="text-sm font-medium text-slate-700">
+          Anexos (opcional)
+        </label>
+        <input
+          id="anexos"
+          name="anexos"
+          type="file"
+          multiple
+          accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.csv,.xls,.xlsx"
+          className="block w-full text-sm text-slate-700"
+        />
+      </div>
+
       {state && 'error' in state && (
         <p className="text-sm text-red-600" role="alert">
           {state.error}

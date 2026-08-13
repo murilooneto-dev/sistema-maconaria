@@ -109,6 +109,7 @@ export async function atualizarMembro(
     remido: boolean
     recolhe: boolean
     emIniciacao: boolean
+    observacao: string
   }
 ): Promise<{ error?: string }> {
   let admin
@@ -126,7 +127,7 @@ export async function atualizarMembro(
   const supabaseAdmin = createSupabaseServiceRoleClient()
   const { data: anterior } = await supabaseAdmin
     .from('membros')
-    .select('nome, matricula, telefone, do_quadro, remido, recolhe, em_iniciacao')
+    .select('nome, matricula, telefone, do_quadro, remido, recolhe, em_iniciacao, observacao')
     .eq('id', id)
     .single()
 
@@ -138,6 +139,7 @@ export async function atualizarMembro(
     remido: dados.remido,
     recolhe: dados.recolhe,
     em_iniciacao: dados.emIniciacao,
+    observacao: dados.observacao.trim() || null,
   }
 
   const { data: atualizado, error } = await supabaseAdmin
