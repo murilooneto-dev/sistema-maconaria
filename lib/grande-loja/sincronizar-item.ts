@@ -1,6 +1,8 @@
 import 'server-only'
 import { createSupabaseServiceRoleClient } from '@/lib/supabase/service'
 
+const MOTIVO_CANCELAMENTO_AUTOMATICO = 'Pagamento da competência revertido/cancelado'
+
 /**
  * Mantém `repasses_grande_loja_itens` em sincronia com o status da
  * mensalidade (SPEC §15): toda competência QUITADA passa a compor o
@@ -10,6 +12,13 @@ import { createSupabaseServiceRoleClient } from '@/lib/supabase/service'
  * (dinheiro fisicamente repassado) não é revertido automaticamente — exige
  * conferência manual, documentado como limitação conhecida.
  *
+ * Um item pode também ficar CANCELADO por marcação manual (usuário
+ * indicando que a competência já foi repassada à Grande Loja fora do
+ * sistema, via ação `marcarItemComoJaRepassado`) — esse cancelamento tem
+ * `motivo_cancelamento` diferente do automático, e por isso NUNCA é
+ * reativado por esta função: só uma reversão explícita (`reverterItemJaRepassado`)
+ * devolve o item para PENDENTE.
+ *
  * Chamado tanto ao registrar quanto ao cancelar pagamento de mensalidade
  * (Fase 6). Non-fatal: falha aqui não deve derrubar o registro/cancelamento
  * do pagamento em si — só a rastreabilidade de Grande Loja fica pendente de
@@ -17,7 +26,8 @@ import { createSupabaseServiceRoleClient } from '@/lib/supabase/service'
  */
 export async function sincronizarItemGrandeLoja(
   supabaseAdmin: ReturnType<typeof createSupabaseServiceRoleClient>,
-  mensalidadeId: string
+  mensalidadeId: string,
+  usuarioId: string
 ): Promise<void> {
   const { data: mensalidade } = await supabaseAdmin
     .from('mensalidades')
@@ -31,7 +41,7 @@ export async function sincronizarItemGrandeLoja(
 
   const { data: item } = await supabaseAdmin
     .from('repasses_grande_loja_itens')
-    .select('id, status, repasse_id')
+    .select('id, status, repasse_id, motivo_cancelamento')
     .eq('mensalidade_id', mensalidadeId)
     .maybeSingle()
 
@@ -44,10 +54,16 @@ export async function sincronizarItemGrandeLoja(
       })
       return
     }
-    if (item.status === 'CANCELADO' && !item.repasse_id) {
+    if (item.status === 'CANCELADO' && !item.repasse_id && item.motivo_cancelamento === MOTIVO_CANCELAMENTO_AUTOMATICO) {
       await supabaseAdmin
         .from('repasses_grande_loja_itens')
-        .update({ status: 'PENDENTE', valor: mensalidade.valor_grande_loja })
+        .update({
+          status: 'PENDENTE',
+          valor: mensalidade.valor_grande_loja,
+          cancelado_por: null,
+          cancelado_em: null,
+          motivo_cancelamento: null,
+        })
         .eq('id', item.id)
     }
     return
@@ -55,6 +71,14 @@ export async function sincronizarItemGrandeLoja(
 
   // Mensalidade não está mais QUITADA (pagamento revertido/cancelado).
   if (item && item.status === 'PENDENTE' && !item.repasse_id) {
-    await supabaseAdmin.from('repasses_grande_loja_itens').update({ status: 'CANCELADO' }).eq('id', item.id)
+    await supabaseAdmin
+      .from('repasses_grande_loja_itens')
+      .update({
+        status: 'CANCELADO',
+        cancelado_por: usuarioId,
+        cancelado_em: new Date().toISOString(),
+        motivo_cancelamento: MOTIVO_CANCELAMENTO_AUTOMATICO,
+      })
+      .eq('id', item.id)
   }
 }

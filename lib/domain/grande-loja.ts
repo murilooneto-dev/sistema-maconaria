@@ -1,5 +1,8 @@
 export type ValidationResult = { valido: true } | { valido: false; erro: string }
 
+/** Motivo gravado quando um item de repasse é marcado manualmente como já repassado fora do sistema (distingue de cancelamento automático por estorno de pagamento). */
+export const MOTIVO_JA_REPASSADO = 'Marcado manualmente como já repassado anteriormente'
+
 export function calcularTotal(itens: { valor: number }[]): number {
   return itens.reduce((s, i) => s + Number(i.valor), 0)
 }

@@ -1,7 +1,7 @@
 'use client'
 
-import { useActionState, useMemo, useState } from 'react'
-import { marcarComoEnviado } from './actions'
+import { Fragment, useActionState, useMemo, useState, useTransition } from 'react'
+import { marcarComoEnviado, marcarItensComoJaRepassados } from './actions'
 
 type Item = {
   id: string
@@ -63,6 +63,84 @@ function valorTexto(itens: GrupoMembro['itens']): string {
   return `R$ ${total.toFixed(2)}`
 }
 
+function DetalheMembro({ grupo }: { grupo: GrupoMembro }) {
+  const [marcados, setMarcados] = useState<Set<string>>(new Set())
+  const [pending, startTransition] = useTransition()
+  const [erro, setErro] = useState<string | null>(null)
+  const [sucesso, setSucesso] = useState<string | null>(null)
+
+  const ordenados = [...grupo.itens].sort((a, b) => a.ano * 12 + a.mes - (b.ano * 12 + b.mes))
+
+  function toggle(itemId: string) {
+    setMarcados((prev) => {
+      const next = new Set(prev)
+      if (next.has(itemId)) next.delete(itemId)
+      else next.add(itemId)
+      return next
+    })
+  }
+
+  function confirmar() {
+    setErro(null)
+    setSucesso(null)
+    startTransition(async () => {
+      const resultado = await marcarItensComoJaRepassados(Array.from(marcados))
+      if (resultado.error) {
+        setErro(resultado.error)
+        return
+      }
+      setSucesso(`${marcados.size} mês(es) marcado(s) como já repassado(s).`)
+      setMarcados(new Set())
+    })
+  }
+
+  return (
+    <div className="space-y-2 border-t border-slate-100 bg-slate-50 px-4 py-3">
+      <p className="text-xs text-slate-500">
+        Marque os meses que já foram repassados à Grande Loja fora do sistema — eles saem do cálculo de repasse e não
+        voltam sozinhos.
+      </p>
+      <ul className="space-y-1">
+        {ordenados.map((item) => (
+          <li key={item.id} className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              id={`ja-repassado-${item.id}`}
+              checked={marcados.has(item.id)}
+              onChange={() => toggle(item.id)}
+            />
+            <label htmlFor={`ja-repassado-${item.id}`} className="cursor-pointer">
+              {String(item.mes).padStart(2, '0')}/{item.ano} — R$ {item.valor.toFixed(2)}
+            </label>
+          </li>
+        ))}
+      </ul>
+
+      {erro && (
+        <p className="text-sm text-red-600" role="alert">
+          {erro}
+        </p>
+      )}
+      {sucesso && (
+        <p className="text-sm text-green-700" role="status">
+          {sucesso}
+        </p>
+      )}
+
+      {marcados.size > 0 && (
+        <button
+          type="button"
+          onClick={confirmar}
+          disabled={pending}
+          className="rounded border border-amber-400 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+        >
+          {pending ? 'Marcando...' : `Marcar ${marcados.size} mês(es) como já repassado(s)`}
+        </button>
+      )}
+    </div>
+  )
+}
+
 export function ItensPendentesForm({
   itens,
   contas,
@@ -75,6 +153,7 @@ export function ItensPendentesForm({
   const [state, formAction, pending] = useActionState(marcarComoEnviado, undefined)
   const grupos = useMemo(() => agruparPorMembro(itens), [itens])
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
+  const [expandido, setExpandido] = useState<string | null>(null)
 
   const totalSelecionado = itens
     .filter((i) => selecionados.has(i.id))
@@ -111,18 +190,36 @@ export function ItensPendentesForm({
           <tbody>
             {grupos.map((grupo) => {
               const marcado = grupo.itens.every((i) => selecionados.has(i.id))
+              const aberto = expandido === grupo.membroId
               return (
-                <tr key={grupo.membroId} className="border-b border-slate-100 last:border-0">
-                  <td className="px-2 py-1.5">
-                    <input type="checkbox" checked={marcado} onChange={() => toggleGrupo(grupo)} />
-                    {grupo.itens.map((item) => (
-                      <input key={item.id} type="checkbox" name="itemId" value={item.id} checked={selecionados.has(item.id)} readOnly className="hidden" />
-                    ))}
-                  </td>
-                  <td className="px-2 py-1.5">{grupo.membroNome}</td>
-                  <td className="px-2 py-1.5">{competenciasTexto(grupo.itens)}</td>
-                  <td className="px-2 py-1.5">{valorTexto(grupo.itens)}</td>
-                </tr>
+                <Fragment key={grupo.membroId}>
+                  <tr className="border-b border-slate-100 last:border-0">
+                    <td className="px-2 py-1.5">
+                      <input type="checkbox" checked={marcado} onChange={() => toggleGrupo(grupo)} />
+                      {grupo.itens.map((item) => (
+                        <input key={item.id} type="checkbox" name="itemId" value={item.id} checked={selecionados.has(item.id)} readOnly className="hidden" />
+                      ))}
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setExpandido(aberto ? null : grupo.membroId)}
+                        className="text-left font-medium text-slate-900 underline decoration-dotted hover:text-slate-600"
+                      >
+                        {grupo.membroNome}
+                      </button>
+                    </td>
+                    <td className="px-2 py-1.5">{competenciasTexto(grupo.itens)}</td>
+                    <td className="px-2 py-1.5">{valorTexto(grupo.itens)}</td>
+                  </tr>
+                  {aberto && (
+                    <tr>
+                      <td colSpan={4} className="p-0">
+                        <DetalheMembro grupo={grupo} />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               )
             })}
           </tbody>
