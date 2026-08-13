@@ -49,7 +49,7 @@ export function JaRepassadosList({ itens }: { itens: Item[] }) {
 
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="border-b border-slate-200 text-left text-slate-500">
+          <thead className="sticky top-0 z-10 border-b border-slate-200 bg-white text-left text-slate-500">
             <tr>
               <th className="px-2 py-2 font-medium">Membro</th>
               <th className="px-2 py-2 font-medium">Competência</th>
