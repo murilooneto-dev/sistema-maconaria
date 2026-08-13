@@ -14,6 +14,7 @@ type Membro = {
   em_iniciacao: boolean
   situacao: string
   data_cadastro: string
+  observacao: string | null
 }
 
 export function MembroDetalhe({ membro, isAdmin }: { membro: Membro; isAdmin: boolean }) {
@@ -26,6 +27,7 @@ export function MembroDetalhe({ membro, isAdmin }: { membro: Membro; isAdmin: bo
   const [remido, setRemido] = useState(membro.remido)
   const [recolhe, setRecolhe] = useState(membro.recolhe)
   const [emIniciacao, setEmIniciacao] = useState(membro.em_iniciacao)
+  const [observacao, setObservacao] = useState(membro.observacao ?? '')
   const [feedback, setFeedback] = useState<{ message: string; isError: boolean } | null>(null)
 
   function handleSave() {
@@ -38,6 +40,7 @@ export function MembroDetalhe({ membro, isAdmin }: { membro: Membro; isAdmin: bo
         remido,
         recolhe,
         emIniciacao,
+        observacao,
       })
       setFeedback({ message: result.error ?? 'Membro atualizado.', isError: Boolean(result.error) })
       if (!result.error) {
@@ -101,6 +104,18 @@ export function MembroDetalhe({ membro, isAdmin }: { membro: Membro; isAdmin: bo
               Em iniciação
             </label>
           </div>
+          <div className="space-y-1">
+            <label htmlFor="observacao" className="text-sm font-medium text-slate-700">
+              Observação
+            </label>
+            <textarea
+              id="observacao"
+              value={observacao}
+              onChange={(e) => setObservacao(e.target.value)}
+              rows={3}
+              className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
           <div className="space-x-2">
             <button
               type="button"
@@ -161,6 +176,10 @@ export function MembroDetalhe({ membro, isAdmin }: { membro: Membro; isAdmin: bo
               <dd className="font-medium text-slate-900">
                 {new Date(membro.data_cadastro).toLocaleDateString('pt-BR')}
               </dd>
+            </div>
+            <div className="col-span-2">
+              <dt className="text-slate-500">Observação</dt>
+              <dd className="whitespace-pre-wrap font-medium text-slate-900">{membro.observacao ?? '—'}</dd>
             </div>
           </dl>
 

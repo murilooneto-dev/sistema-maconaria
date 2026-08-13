@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import { cancelarMovimentacao } from './actions'
+import { AnexosExpandable } from '@/components/anexos/AnexosExpandable'
+import type { AnexoItem } from '@/components/anexos/AnexosList'
 
 type Movimentacao = {
   id: string
@@ -26,9 +28,11 @@ function nomeRelacionado(rel: { nome: string }[] | { nome: string } | null): str
 export function MovimentacoesTable({
   movimentacoes,
   podeEditar,
+  anexosPorMovimentacao,
 }: {
   movimentacoes: Movimentacao[]
   podeEditar: boolean
+  anexosPorMovimentacao: Record<string, AnexoItem[]>
 }) {
   const [isPending, startTransition] = useTransition()
   const [feedback, setFeedback] = useState<{ id: string; message: string; isError: boolean } | null>(
@@ -67,6 +71,7 @@ export function MovimentacoesTable({
             <th className="px-4 py-2 font-medium">Membro</th>
             <th className="px-4 py-2 font-medium">Valor</th>
             <th className="px-4 py-2 font-medium">Situação</th>
+            <th className="px-4 py-2 font-medium">Anexos</th>
             {podeEditar && <th className="px-4 py-2 font-medium">Ações</th>}
           </tr>
         </thead>
@@ -91,6 +96,9 @@ export function MovimentacoesTable({
                     Cancelada
                   </span>
                 )}
+              </td>
+              <td className="px-4 py-2">
+                <AnexosExpandable anexos={anexosPorMovimentacao[mov.id] ?? []} podeExcluir={podeEditar} />
               </td>
               {podeEditar && (
                 <td className="px-4 py-2">

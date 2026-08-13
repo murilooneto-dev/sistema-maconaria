@@ -6,6 +6,7 @@ import { createSupabaseServiceRoleClient } from '@/lib/supabase/service'
 import { registrarAuditoria } from '@/lib/audit'
 import { validarMovimentacao } from '@/lib/domain/financeiro'
 import { periodoEstaFechado } from '@/lib/financeiro/periodo'
+import { uploadAnexosDoFormulario } from '@/lib/anexos/upload'
 
 type ActionState = { error: string } | { success: string } | undefined
 
@@ -87,7 +88,19 @@ export async function registrarMovimentacao(
     console.error('Falha ao registrar auditoria (movimentação criada com sucesso):', auditError)
   }
 
+  // Anexos são um dado auxiliar do comprovante — falha no upload não desfaz
+  // uma movimentação já registrada e confirmada com sucesso, só vira aviso.
+  const { erros: errosAnexos } = await uploadAnexosDoFormulario(supabaseAdmin, formData, 'anexos', {
+    entidadeTipo: 'MOVIMENTACAO',
+    entidadeId: criada.id,
+    enviadoPor: usuario.id,
+  })
+
   revalidatePath('/financeiro')
+
+  if (errosAnexos.length > 0) {
+    return { success: `Movimentação registrada com sucesso. Falha ao anexar arquivo(s): ${errosAnexos.join(' ')}` }
+  }
   return { success: 'Movimentação registrada com sucesso.' }
 }
 

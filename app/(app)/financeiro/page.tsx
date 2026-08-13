@@ -64,6 +64,27 @@ export default async function FinanceiroPage({
     )
   }
 
+  let anexosPorMovimentacao: Record<string, { id: string; nome_arquivo: string; tamanho_bytes: number; criado_em: string }[]> = {}
+  if ((movimentacoes ?? []).length > 0) {
+    const { data: anexosData } = await supabase
+      .from('anexos')
+      .select('id, nome_arquivo, tamanho_bytes, criado_em, entidade_id')
+      .eq('entidade_tipo', 'MOVIMENTACAO')
+      .eq('status', 'ATIVO')
+      .in(
+        'entidade_id',
+        (movimentacoes ?? []).map((m) => m.id)
+      )
+      .order('criado_em', { ascending: false })
+
+    anexosPorMovimentacao = {}
+    for (const anexo of anexosData ?? []) {
+      const lista = anexosPorMovimentacao[anexo.entidade_id] ?? []
+      lista.push(anexo)
+      anexosPorMovimentacao[anexo.entidade_id] = lista
+    }
+  }
+
   const ativas = (movimentacoes ?? []).filter((m) => m.status === 'ATIVO')
   const totalEntradas = ativas.filter((m) => m.tipo === 'ENTRADA').reduce((s, m) => s + Number(m.valor), 0)
   const totalSaidas = ativas.filter((m) => m.tipo === 'SAIDA').reduce((s, m) => s + Number(m.valor), 0)
@@ -159,7 +180,11 @@ export default async function FinanceiroPage({
       {(movimentacoes ?? []).length === 0 ? (
         <p className="text-sm text-slate-500">Nenhuma movimentação encontrada.</p>
       ) : (
-        <MovimentacoesTable movimentacoes={movimentacoes ?? []} podeEditar={podeEditar} />
+        <MovimentacoesTable
+          movimentacoes={movimentacoes ?? []}
+          podeEditar={podeEditar}
+          anexosPorMovimentacao={anexosPorMovimentacao}
+        />
       )}
     </div>
   )
