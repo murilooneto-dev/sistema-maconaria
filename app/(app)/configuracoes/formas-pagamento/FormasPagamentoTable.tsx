@@ -36,7 +36,7 @@ export function FormasPagamentoTable({ formas }: { formas: FormaPagamento[] }) {
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+    <div className="max-h-[70vh] overflow-auto rounded-lg border border-slate-200 bg-white">
       <table className="w-full text-sm">
         <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 text-left text-slate-500">
           <tr>
