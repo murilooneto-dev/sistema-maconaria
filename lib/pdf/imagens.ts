@@ -41,3 +41,34 @@ export async function buscarImagemStorage(
 
   return { bytes, formato }
 }
+
+/**
+ * Baixa uma imagem a partir da URL pública (ex: `logo_url` de `loja_config`,
+ * que guarda a URL completa do bucket público `loja-assets`, não um caminho
+ * relativo) e devolve os bytes prontos para embutir no PDF.
+ */
+export async function buscarImagemUrl(url: string | null): Promise<ImagemEmbutida | null> {
+  if (!url) return null
+
+  let resposta: Response
+  try {
+    resposta = await fetch(url)
+  } catch (err) {
+    console.error(`Falha ao baixar imagem da URL "${url}":`, err)
+    return null
+  }
+
+  if (!resposta.ok) {
+    console.error(`Falha ao baixar imagem da URL "${url}": HTTP ${resposta.status}`)
+    return null
+  }
+
+  const bytes = new Uint8Array(await resposta.arrayBuffer())
+  const formato = detectarFormato(bytes)
+  if (!formato) {
+    console.error(`Imagem da URL "${url}" não é PNG nem JPEG — não pode ser embutida no PDF.`)
+    return null
+  }
+
+  return { bytes, formato }
+}

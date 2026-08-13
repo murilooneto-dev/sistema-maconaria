@@ -1,4 +1,5 @@
-import { PDFDocument, StandardFonts, rgb, type PDFFont } from 'pdf-lib'
+import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from 'pdf-lib'
+import type { ImagemEmbutida } from '@/lib/pdf/recibo'
 
 export type DadosTabelaPdf = {
   titulo: string
@@ -6,6 +7,8 @@ export type DadosTabelaPdf = {
   resumo?: { label: string; valor: string }[]
   colunas: string[]
   linhas: string[][]
+  lojaNome?: string
+  logo?: ImagemEmbutida | null
 }
 
 const COR_TEXTO = rgb(0.13, 0.13, 0.15)
@@ -13,7 +16,20 @@ const COR_TEXTO_CLARO = rgb(0.42, 0.42, 0.46)
 const COR_LINHA = rgb(0.85, 0.85, 0.87)
 const COR_CABECALHO_FUNDO = rgb(0.94, 0.94, 0.95)
 
-/** Gera um PDF tabular genérico (título + resumo opcional + tabela paginada) — usado pelos relatórios da Fase 11. */
+/** Desenha uma imagem ocupando no máximo `maxW`x`maxH`, preservando proporção, ancorada em (x, yTopo). */
+function desenharImagemProporcional(page: PDFPage, img: PDFImage, x: number, yTopo: number, maxW: number, maxH: number): number {
+  const proporcao = img.width / img.height
+  let largura = maxW
+  let altura = largura / proporcao
+  if (altura > maxH) {
+    altura = maxH
+    largura = altura * proporcao
+  }
+  page.drawImage(img, { x, y: yTopo - altura, width: largura, height: altura })
+  return largura
+}
+
+/** Gera um PDF tabular genérico (cabeçalho da Loja + título + resumo opcional + tabela paginada) — usado pelos relatórios da Fase 11. */
 export async function gerarPdfTabela(dados: DadosTabelaPdf): Promise<Uint8Array> {
   const pdf = await PDFDocument.create()
   const fontRegular = await pdf.embedFont(StandardFonts.Helvetica)
@@ -25,13 +41,44 @@ export async function gerarPdfTabela(dados: DadosTabelaPdf): Promise<Uint8Array>
   const larguraUtil = larguraPagina - margem * 2
   const alturaLinha = 20
 
+  const logoImg = dados.logo
+    ? await (dados.logo.formato === 'png' ? pdf.embedPng(dados.logo.bytes) : pdf.embedJpg(dados.logo.bytes)).catch(
+        (err) => {
+          console.error('Falha ao embutir logo no relatório:', err)
+          return null
+        }
+      )
+    : null
+
   let page = pdf.addPage([larguraPagina, alturaPagina])
   let y = alturaPagina - margem
+
+  function desenharCabecalhoLoja() {
+    if (!dados.lojaNome && !logoImg) return
+    const alturaCabecalho = 28
+    let xTexto = margem
+    if (logoImg) {
+      xTexto = margem + desenharImagemProporcional(page, logoImg, margem, y, alturaCabecalho, alturaCabecalho) + 10
+    }
+    if (dados.lojaNome) {
+      page.drawText(dados.lojaNome, {
+        x: xTexto,
+        y: y - alturaCabecalho / 2 - 4,
+        size: 12,
+        font: fontBold,
+        color: COR_TEXTO,
+      })
+    }
+    y -= alturaCabecalho + 12
+  }
 
   function novaPagina() {
     page = pdf.addPage([larguraPagina, alturaPagina])
     y = alturaPagina - margem
+    desenharCabecalhoLoja()
   }
+
+  desenharCabecalhoLoja()
 
   page.drawText(dados.titulo, { x: margem, y, size: 16, font: fontBold, color: COR_TEXTO })
   y -= 20
