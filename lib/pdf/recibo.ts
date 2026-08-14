@@ -47,15 +47,15 @@ function desenharImagemProporcional(
   return { largura, altura }
 }
 
-/** Gera o PDF de um recibo (Mensalidade ou Campanha) — SPEC §27, layout padronizado com tabela de dados. */
+/** Gera o PDF de um recibo (Mensalidade ou Campanha) — SPEC §27, layout retrato compactado na metade superior da folha A4 (permite imprimir 2 recibos por folha). */
 export async function gerarPdfRecibo(dados: DadosRecibo): Promise<Uint8Array> {
   const pdf = await PDFDocument.create()
-  const page = pdf.addPage([595.28, 841.89]) // A4
+  const page = pdf.addPage([595.28, 841.89]) // A4 retrato
   const fontRegular = await pdf.embedFont(StandardFonts.Helvetica)
   const fontBold = await pdf.embedFont(StandardFonts.HelveticaBold)
   const fontOblique = await pdf.embedFont(StandardFonts.HelveticaOblique)
 
-  const margem = 56
+  const margem = 40
   const larguraPagina = page.getWidth()
   const larguraUtil = larguraPagina - margem * 2
   let y = page.getHeight() - margem
@@ -65,7 +65,7 @@ export async function gerarPdfRecibo(dados: DadosRecibo): Promise<Uint8Array> {
   }
 
   // --- Cabeçalho: logo no canto esquerdo + nome da Loja alinhado ao lado ---
-  const alturaCabecalho = 64
+  const alturaCabecalho = 50
   const topoCabecalho = y
   let logoLargura = 0
 
@@ -79,32 +79,32 @@ export async function gerarPdfRecibo(dados: DadosRecibo): Promise<Uint8Array> {
     }
   }
 
-  const xNomeLoja = margem + (logoLargura > 0 ? logoLargura + 16 : 0)
+  const xNomeLoja = margem + (logoLargura > 0 ? logoLargura + 14 : 0)
   page.drawText(dados.lojaNome, {
     x: xNomeLoja,
-    y: topoCabecalho - alturaCabecalho / 2 - 2,
-    size: 16,
+    y: topoCabecalho - alturaCabecalho / 2 - 1,
+    size: 15,
     font: fontBold,
     color: COR_TITULO,
   })
   page.drawText('Comprovante de recebimento', {
     x: xNomeLoja,
-    y: topoCabecalho - alturaCabecalho / 2 - 18,
-    size: 9,
+    y: topoCabecalho - alturaCabecalho / 2 - 16,
+    size: 8,
     font: fontOblique,
     color: COR_TEXTO_CLARO,
   })
 
-  y = topoCabecalho - alturaCabecalho - 12
+  y = topoCabecalho - alturaCabecalho - 10
   page.drawLine({ start: { x: margem, y }, end: { x: margem + larguraUtil, y }, thickness: 1, color: COR_LINHA })
 
   // --- Título "RECIBO" + número de referência ---
-  y -= 42
+  y -= 32
   const tituloTexto = 'RECIBO'
   page.drawText(tituloTexto, {
-    x: margem + larguraUtil / 2 - fontBold.widthOfTextAtSize(tituloTexto, 22) / 2,
+    x: margem + larguraUtil / 2 - fontBold.widthOfTextAtSize(tituloTexto, 18) / 2,
     y,
-    size: 22,
+    size: 18,
     font: fontBold,
     color: COR_TITULO,
   })
@@ -112,14 +112,14 @@ export async function gerarPdfRecibo(dados: DadosRecibo): Promise<Uint8Array> {
   const numeroRecibo = `Nº ${dados.id.slice(0, 8).toUpperCase()}`
   page.drawText(numeroRecibo, {
     x: margem + larguraUtil - fontRegular.widthOfTextAtSize(numeroRecibo, 9),
-    y: y + 4,
+    y: y + 3,
     size: 9,
     font: fontRegular,
     color: COR_TEXTO_CLARO,
   })
 
   // --- Tabela de dados ---
-  y -= 40
+  y -= 26
   const valorFormatado = `R$ ${dados.valor.toFixed(2).replace('.', ',')}`
   const tipoLabel = dados.tipo === 'MENSALIDADE' ? 'Mensalidade' : 'Doação (Campanha)'
 
@@ -137,18 +137,18 @@ export async function gerarPdfRecibo(dados: DadosRecibo): Promise<Uint8Array> {
   y = desenharTabela(page, fontRegular, fontBold, margem, y, larguraUtil, linhas)
 
   // --- Declaração ---
-  y -= 30
+  y -= 16
   const declaracao =
     dados.tipo === 'MENSALIDADE'
       ? 'Para clareza e como comprovante de quitação, firmamos o presente recibo.'
       : 'Para clareza e como comprovante de recebimento da doação, firmamos o presente recibo.'
-  for (const linha of quebrarLinhas(declaracao, fontRegular, 11, larguraUtil)) {
-    page.drawText(linha, { x: margem, y, size: 11, font: fontRegular, color: COR_TEXTO })
-    y -= 16
+  for (const linha of quebrarLinhas(declaracao, fontRegular, 10, larguraUtil)) {
+    page.drawText(linha, { x: margem, y, size: 10, font: fontRegular, color: COR_TEXTO })
+    y -= 14
   }
 
   // --- Assinaturas: Venerável Mestre à esquerda, Tesoureiro à direita ---
-  const yAssinatura = Math.min(y - 60, margem + 150)
+  const yAssinatura = y - 24
   const centroEsquerda = margem + larguraUtil * 0.25
   const centroDireita = margem + larguraUtil * 0.75
 
@@ -156,13 +156,13 @@ export async function gerarPdfRecibo(dados: DadosRecibo): Promise<Uint8Array> {
     if (imagem) {
       try {
         const img = await embutir(imagem)
-        desenharImagemProporcional(page, img, centroX, yAssinatura + 50, 170, 50, 'centro')
+        desenharImagemProporcional(page, img, centroX, yAssinatura + 38, 150, 38, 'centro')
       } catch (err) {
         console.error(`Recibo ${dados.id}: falha ao embutir assinatura (${cargo}):`, err)
       }
     }
 
-    const linhaLargura = 190
+    const linhaLargura = 175
     page.drawLine({
       start: { x: centroX - linhaLargura / 2, y: yAssinatura },
       end: { x: centroX + linhaLargura / 2, y: yAssinatura },
@@ -171,15 +171,15 @@ export async function gerarPdfRecibo(dados: DadosRecibo): Promise<Uint8Array> {
     })
 
     page.drawText(cargo, {
-      x: centroX - fontRegular.widthOfTextAtSize(cargo, 11) / 2,
-      y: yAssinatura - 16,
-      size: 11,
+      x: centroX - fontRegular.widthOfTextAtSize(cargo, 10) / 2,
+      y: yAssinatura - 14,
+      size: 10,
       font: fontRegular,
       color: COR_TEXTO,
     })
     page.drawText(dados.lojaNome, {
       x: centroX - fontOblique.widthOfTextAtSize(dados.lojaNome, 9) / 2,
-      y: yAssinatura - 30,
+      y: yAssinatura - 27,
       size: 9,
       font: fontOblique,
       color: COR_TEXTO_CLARO,
@@ -192,7 +192,7 @@ export async function gerarPdfRecibo(dados: DadosRecibo): Promise<Uint8Array> {
   return pdf.save()
 }
 
-/** Desenha uma tabela de duas colunas (rótulo/valor) com bordas, devolve o y após a tabela. */
+/** Desenha uma tabela de duas colunas (rótulo/valor) com bordas, quebrando o valor em várias linhas quando não cabe na coluna. Devolve o y após a tabela. */
 function desenharTabela(
   page: import('pdf-lib').PDFPage,
   fontRegular: PDFFont,
@@ -202,9 +202,19 @@ function desenharTabela(
   largura: number,
   linhas: [string, string][]
 ): number {
-  const alturaLinha = 26
   const colunaLabel = 130
-  const alturaTotal = alturaLinha * linhas.length
+  const tamanhoFonte = 10
+  const alturaLinhaTexto = 13
+  const paddingVertical = 6
+  const larguraValor = largura - colunaLabel - 20
+
+  const linhasProcessadas = linhas.map(([label, valor]) => {
+    const valorLinhas = quebrarLinhas(valor, fontRegular, tamanhoFonte, larguraValor)
+    const altura = Math.max(valorLinhas.length, 1) * alturaLinhaTexto + paddingVertical * 2
+    return { label, valorLinhas, altura }
+  })
+
+  const alturaTotal = linhasProcessadas.reduce((soma, l) => soma + l.altura, 0)
 
   page.drawRectangle({
     x,
@@ -223,8 +233,8 @@ function desenharTabela(
     color: COR_LINHA,
   })
 
-  linhas.forEach(([label, valor], i) => {
-    const yLinhaTopo = yTopo - alturaLinha * i
+  let yLinhaTopo = yTopo
+  linhasProcessadas.forEach(({ label, valorLinhas, altura }, i) => {
     if (i > 0) {
       page.drawLine({
         start: { x, y: yLinhaTopo },
@@ -234,23 +244,23 @@ function desenharTabela(
       })
     }
 
-    const yTexto = yLinhaTopo - alturaLinha / 2 - 4
-    page.drawText(label, { x: x + 10, y: yTexto, size: 10, font: fontBold, color: COR_TEXTO_CLARO })
+    const yPrimeiraLinha = yLinhaTopo - paddingVertical - alturaLinhaTexto + 3
+    page.drawText(label, { x: x + 10, y: yPrimeiraLinha, size: tamanhoFonte, font: fontBold, color: COR_TEXTO_CLARO })
 
-    const valorTruncado = truncarTexto(valor, fontRegular, 10, largura - colunaLabel - 20)
-    page.drawText(valorTruncado, { x: x + colunaLabel + 10, y: yTexto, size: 10, font: fontRegular, color: COR_TEXTO })
+    valorLinhas.forEach((linhaValor, j) => {
+      page.drawText(linhaValor, {
+        x: x + colunaLabel + 10,
+        y: yPrimeiraLinha - alturaLinhaTexto * j,
+        size: tamanhoFonte,
+        font: fontRegular,
+        color: COR_TEXTO,
+      })
+    })
+
+    yLinhaTopo -= altura
   })
 
   return yTopo - alturaTotal
-}
-
-function truncarTexto(texto: string, font: PDFFont, size: number, larguraMax: number): string {
-  if (font.widthOfTextAtSize(texto, size) <= larguraMax) return texto
-  let truncado = texto
-  while (truncado.length > 1 && font.widthOfTextAtSize(`${truncado}…`, size) > larguraMax) {
-    truncado = truncado.slice(0, -1)
-  }
-  return `${truncado}…`
 }
 
 function quebrarLinhas(texto: string, font: PDFFont, size: number, larguraMax: number): string[] {
