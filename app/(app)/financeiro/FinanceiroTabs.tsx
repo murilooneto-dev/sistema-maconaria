@@ -14,7 +14,7 @@ export function FinanceiroTabs() {
   const pathname = usePathname()
 
   return (
-    <div className="flex gap-2 border-b border-slate-200 text-sm">
+    <div className="flex gap-2 overflow-x-auto border-b border-slate-200 text-sm">
       {TABS.map((tab) => {
         const isActive = pathname === tab.href
         return (
@@ -23,8 +23,8 @@ export function FinanceiroTabs() {
             href={tab.href}
             className={
               isActive
-                ? 'border-b-2 border-slate-900 px-3 py-2 font-medium text-slate-900'
-                : 'border-b-2 border-transparent px-3 py-2 text-slate-500 hover:text-slate-900'
+                ? 'shrink-0 whitespace-nowrap border-b-2 border-slate-900 px-3 py-2 font-medium text-slate-900'
+                : 'shrink-0 whitespace-nowrap border-b-2 border-transparent px-3 py-2 text-slate-500 hover:text-slate-900'
             }
           >
             {tab.label}

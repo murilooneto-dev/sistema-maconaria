@@ -51,7 +51,7 @@ export default async function RelatorioCampanhasPage({
           </button>
         </form>
       ) : (
-        <form className="flex items-end gap-3 rounded-lg border border-slate-200 bg-white p-4 text-sm">
+        <form className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4 text-sm">
           <div className="space-y-1">
             <label className="text-xs font-medium text-slate-500">Status</label>
             <select name="status" defaultValue={params.status ?? ''} className="w-full rounded border border-slate-300 px-2 py-1">

@@ -43,7 +43,7 @@ export default async function CampanhasPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-semibold text-slate-900">Campanhas</h1>
         {podeCriar && (
           <Link href="/campanhas/nova" className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white">

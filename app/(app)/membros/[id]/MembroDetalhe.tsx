@@ -86,7 +86,7 @@ export function MembroDetalhe({ membro, isAdmin }: { membro: Membro; isAdmin: bo
               className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
             />
           </div>
-          <div className="flex gap-6">
+          <div className="flex flex-wrap gap-x-6 gap-y-2">
             <label className="flex items-center gap-2 text-sm text-slate-700">
               <input type="checkbox" checked={doQuadro} onChange={(e) => setDoQuadro(e.target.checked)} />
               Do quadro

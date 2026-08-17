@@ -73,7 +73,7 @@ export function HistoricoRepasses({
     <div className="space-y-4">
       <h2 className="text-sm font-semibold text-slate-900">Histórico de repasses</h2>
 
-      <form className="flex items-end gap-3 rounded-lg border border-slate-200 bg-white p-4 text-sm">
+      <form className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4 text-sm">
         <div className="space-y-1">
           <label className="text-xs font-medium text-slate-500">Ano</label>
           <input
