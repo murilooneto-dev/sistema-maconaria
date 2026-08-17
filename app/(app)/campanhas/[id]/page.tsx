@@ -57,13 +57,13 @@ export default async function CampanhaDetalhePage({ params }: { params: Promise<
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold text-slate-900">{campanha.titulo}</h1>
           <p className="text-sm text-slate-500">{STATUS_LABEL[campanha.status]}</p>
         </div>
         {podeEditar && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <EditarCampanhaForm campanha={campanha} />
             <StatusCampanhaActions campanhaId={campanha.id} status={campanha.status} />
           </div>

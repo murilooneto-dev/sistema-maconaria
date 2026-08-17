@@ -48,7 +48,7 @@ export default async function RecibosPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-semibold text-slate-900">Recibos</h1>
         {podeGerar && (
           <Link href="/recibos/novo" className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white">

@@ -30,7 +30,7 @@ export default async function DashboardPage({
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-semibold text-slate-900">Dashboard</h1>
-        <form className="flex items-end gap-2 text-sm">
+        <form className="flex flex-wrap items-end gap-2 text-sm">
           <div className="space-y-1">
             <label className="text-xs font-medium text-slate-500">De</label>
             <input

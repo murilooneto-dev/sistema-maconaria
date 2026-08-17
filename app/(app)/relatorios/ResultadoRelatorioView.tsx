@@ -13,12 +13,12 @@ export function ResultadoRelatorioView({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-slate-900">{resultado.titulo}</h2>
           {resultado.subtitulo && <p className="text-sm text-slate-500">{resultado.subtitulo}</p>}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <a
             href={`/relatorios/${slug}/pdf${sufixo}`}
             target="_blank"

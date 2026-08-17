@@ -45,7 +45,7 @@ export function NovoMembroForm() {
         />
       </div>
 
-      <div className="flex gap-6">
+      <div className="flex flex-wrap gap-x-6 gap-y-2">
         <label className="flex items-center gap-2 text-sm text-slate-700">
           <input type="checkbox" name="doQuadro" defaultChecked />
           Do quadro
