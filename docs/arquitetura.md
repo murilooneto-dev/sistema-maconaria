@@ -29,7 +29,9 @@ Este documento descreve a estrutura de pastas, o fluxo de autenticação e os m�
 │   │   └── actions.ts            # Server Actions: signIn(), signOut()
 │   └── (app)/                    # Route group autenticado
 │       ├── layout.tsx            # Verifica sessão, carrega profile, monta Sidebar+Header
-│       ├── dashboard/page.tsx
+│       ├── dashboard/                 # Dashboard com dados reais — Fase 12
+│       │   ├── page.tsx                # Cards (membros/financeiro), filtro de período, saldos, campanhas, últimas movimentações
+│       │   └── GraficoEntradasSaidas.tsx # Gráfico de barras SVG puro (sem dependência nova) — últimos 6 meses
 │       ├── membros/
 │       │   ├── page.tsx               # Lista de membros com filtros (Server Component, leitura liberada a todo autenticado) — Fase 5
 │       │   ├── actions.ts             # Server Actions: criarMembro, atualizarMembro (admin-only via requireAdmin) — Fase 5
@@ -182,6 +184,8 @@ Este documento descreve a estrutura de pastas, o fluxo de autenticação e os m�
 │   │   ├── grande-loja.ts        # buscarRelatorioGrandeLoja()
 │   │   ├── saldos.ts             # buscarRelatorioSaldos() — reusa calcularSaldoConta() da Fase 7
 │   │   └── mensalidades.ts       # buscarRelatorioMensalidades() — reusa contarCompetenciasVencidasNaoPagas() da Fase 5/6
+│   ├── dashboard/                 # Fase 12
+│   │   └── dados.ts              # buscarDadosDashboard() — cards, gráfico, saldos, campanhas e últimas movimentações num único fetch
 │   └── supabase/
 │       ├── client.ts             # createSupabaseBrowserClient() — uso em Client Components
 │       ├── server.ts             # createSupabaseServerClient() — uso em Server Components/Actions
@@ -282,6 +286,8 @@ Ver `.env.example` na raiz e `docs/instalacao.md` para o passo a passo de config
 - **Fase 10 (Recibos):** geração de recibo (Mensalidade a partir de um pagamento ATIVO, Campanha a partir de uma doação ATIVA) com PDF gerado sob demanda via Route Handler (`/recibos/[id]/pdf`, `pdf-lib`) — não armazenado em Storage, recriado a cada download a partir dos dados gravados em `recibos` e da assinatura/logo vigentes na época (a `assinatura_url` é congelada no momento da geração, preservando o histórico mesmo que a assinatura configurada mude depois). Cargo fixo "Venerável Mestre", data em DD/MM/YYYY (`formatarDataBR`). Sem edição/exclusão de recibo (só `INSERT`/`SELECT` no banco — reemitir uma segunda via cria um novo registro). **Sem testes automatizados**, mesmo padrão das Fases 7–9.
 
 - **Fase 11 (Relatórios):** os 7 relatórios do SPEC §29 (membros, campanhas geral, campanha específica, financeiro, Grande Loja, saldos por conta, mensalidades/inadimplência), cada um com tela + export PDF (`gerarPdfTabela`, tabular genérico e paginado) + export "Excel" (CSV com separador `;` e BOM UTF-8, `gerarCsv`) — decisão técnica: CSV em vez de `.xlsx` real para não adicionar uma dependência pesada (`xlsx`/`exceljs`) nesta fase; Excel abre `.csv` nativamente. Cada relatório tem um único módulo em `lib/relatorios/` que busca os dados uma vez e alimenta tela, PDF e CSV — evita divergência entre o que a tela mostra e o que é exportado. Resumo geral e campanha específica são a mesma rota (`/relatorios/campanhas`), alternando pelo parâmetro `campanhaId`. **Sem testes automatizados**, mesmo padrão das Fases 7–10.
+
+- **Fase 12 (Dashboard):** `lib/dashboard/dados.ts` (`buscarDadosDashboard`) busca tudo em uma função só — cards (total/ativos/inativos de membros do quadro, inadimplentes via `contarCompetenciasVencidasNaoPagas`, entradas/saídas do período filtrável, saldo consolidado via `calcularSaldoConta`), gráfico de entradas x saídas dos últimos 6 meses (fixo, independente do filtro de período), saldos por conta, campanhas em andamento (via `calcularArrecadado`/`calcularPercentual`) e últimas 8 movimentações. Gráfico é SVG puro embutido (`GraficoEntradasSaidas.tsx`) — sem adicionar biblioteca de charts. Roadmap de 15 fases encerrado aqui: Fases 14 (Testes) e 15 (Deploy formal) descartadas pelo usuário em 2026-08-13 — sistema já em produção com domínio próprio e uso diário real. Fase 13 (Segurança/revisão) é a última planejada.
 
 ## Fora de escopo (Fase 11)
 
