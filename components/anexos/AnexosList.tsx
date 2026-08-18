@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { obterUrlAnexo, excluirAnexo } from '@/app/(app)/anexos/actions'
+import { formatarDataBR } from '@/lib/format'
 
 export type AnexoItem = {
   id: string
@@ -59,7 +60,7 @@ export function AnexosList({ anexos, podeExcluir }: { anexos: AnexoItem[]; podeE
           <span className="truncate text-slate-700">
             {anexo.nome_arquivo}{' '}
             <span className="text-xs text-slate-400">
-              ({formatarTamanho(anexo.tamanho_bytes)} · {new Date(anexo.criado_em).toLocaleDateString('pt-BR')})
+              ({formatarTamanho(anexo.tamanho_bytes)} · {formatarDataBR(anexo.criado_em.split('T')[0])})
             </span>
           </span>
           <span className="flex shrink-0 gap-2">

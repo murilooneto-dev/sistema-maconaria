@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { AcessoNegado } from '@/components/AcessoNegado'
-import { formatarDataBR } from '@/lib/format'
+import { formatarDataBR, formatarMoedaBR } from '@/lib/format'
 
 const TIPO_LABEL: Record<string, string> = {
   MENSALIDADE: 'Mensalidade',
@@ -107,7 +107,7 @@ export default async function RecibosPage({
                   <td className="px-4 py-2">{TIPO_LABEL[r.tipo]}</td>
                   <td className="px-4 py-2">{r.pessoa}</td>
                   <td className="px-4 py-2">{r.referencia}</td>
-                  <td className="px-4 py-2">R$ {Number(r.valor).toFixed(2)}</td>
+                  <td className="px-4 py-2">{formatarMoedaBR(Number(r.valor))}</td>
                   <td className="px-4 py-2">
                     <a
                       href={`/recibos/${r.id}/pdf`}

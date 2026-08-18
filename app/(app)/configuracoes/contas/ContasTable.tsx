@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { atualizarConta } from './actions'
+import { formatarDataBR, formatarMoedaBR } from '@/lib/format'
 
 type Conta = {
   id: string
@@ -89,10 +90,10 @@ export function ContasTable({ contas }: { contas: Conta[] }) {
               <td className="px-4 py-2">
                 {editingId === conta.id
                   ? '—'
-                  : conta.saldo_inicial.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  : formatarMoedaBR(conta.saldo_inicial)}
               </td>
               <td className="px-4 py-2">
-                {editingId === conta.id ? '—' : new Date(conta.data_saldo_inicial).toLocaleDateString('pt-BR')}
+                {editingId === conta.id ? '—' : formatarDataBR(conta.data_saldo_inicial)}
               </td>
               <td className="px-4 py-2">
                 <span className={conta.ativo ? 'text-green-700' : 'text-slate-400'}>

@@ -2,7 +2,7 @@
 
 import { Fragment, useState, useTransition } from 'react'
 import { cancelarRepasse } from './actions'
-import { formatarDataBR, abreviarMes } from '@/lib/format'
+import { formatarDataBR, abreviarMes, formatarMoedaBR } from '@/lib/format'
 
 type Repasse = {
   id: string
@@ -125,7 +125,7 @@ export function HistoricoRepasses({
                     >
                       <td className="px-4 py-2">{formatarDataBR(r.data_envio)}</td>
                       <td className="px-4 py-2">{nomeRelacionado(r.contas)}</td>
-                      <td className="px-4 py-2">R$ {Number(r.valor_total).toFixed(2)}</td>
+                      <td className="px-4 py-2">{formatarMoedaBR(Number(r.valor_total))}</td>
                       <td className="px-4 py-2">
                         {r.status === 'ENVIADO' ? (
                           <span className="text-green-700">Enviado</span>
@@ -175,7 +175,7 @@ export function HistoricoRepasses({
                                     <tr key={item.id}>
                                       <td className="py-1 pr-4">{membroDoItem(item)}</td>
                                       <td className="py-1 pr-4">{competenciaDoItem(item)}</td>
-                                      <td className="py-1 pr-4">R$ {Number(item.valor).toFixed(2)}</td>
+                                      <td className="py-1 pr-4">{formatarMoedaBR(Number(item.valor))}</td>
                                     </tr>
                                   ))}
                                 </tbody>

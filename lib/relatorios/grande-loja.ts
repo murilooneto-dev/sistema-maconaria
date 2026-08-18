@@ -1,5 +1,6 @@
 import type { createSupabaseServerClient } from '@/lib/supabase/server'
 import { calcularTotal } from '@/lib/domain/grande-loja'
+import { formatarMoedaBR } from '@/lib/format'
 import type { ResultadoRelatorio } from './tipos'
 
 const STATUS_LABEL: Record<string, string> = {
@@ -46,14 +47,14 @@ export async function buscarRelatorioGrandeLoja(
       { label: 'Total de itens', valor: String(linhasFiltradas.length) },
       { label: 'Pendentes', valor: String(totalPendentes) },
       { label: 'Enviados', valor: String(totalEnviados) },
-      { label: 'Valor total', valor: `R$ ${totalValor.toFixed(2)}` },
+      { label: 'Valor total', valor: formatarMoedaBR(totalValor) },
     ],
     colunas: ['Membro', 'Competência', 'Valor GL', 'Situação'],
     linhas: linhasFiltradas.map((item) => {
       const m = primeiro(item.mensalidades)
       const membro = m ? primeiro(m.membros) : null
       const competencia = m ? `${String(m.mes).padStart(2, '0')}/${m.ano}` : '-'
-      return [membro?.nome ?? '-', competencia, `R$ ${Number(item.valor).toFixed(2)}`, STATUS_LABEL[item.status] ?? item.status]
+      return [membro?.nome ?? '-', competencia, formatarMoedaBR(Number(item.valor)), STATUS_LABEL[item.status] ?? item.status]
     }),
   }
 }

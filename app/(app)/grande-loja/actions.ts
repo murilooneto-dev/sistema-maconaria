@@ -6,6 +6,7 @@ import { createSupabaseServiceRoleClient } from '@/lib/supabase/service'
 import { registrarAuditoria } from '@/lib/audit'
 import { calcularTotal, validarSelecaoRepasse, MOTIVO_JA_REPASSADO } from '@/lib/domain/grande-loja'
 import { criarMovimentacaoRepasse, cancelarMovimentacaoRepasse } from '@/lib/financeiro/movimentacao-repasse'
+import { formatarMoedaBR } from '@/lib/format'
 
 type ActionState = { error: string } | { success: string } | undefined
 
@@ -117,7 +118,7 @@ export async function marcarComoEnviado(_prevState: ActionState, formData: FormD
       registroTabela: 'repasses_grande_loja',
       registroId: repasse.id,
       dadosNovos: { itens: itens.length, valorTotal, contaId, dataEnvio },
-      descricao: `Repasse de ${itens.length} item(ns) à Grande Loja, valor R$ ${valorTotal.toFixed(2)}`,
+      descricao: `Repasse de ${itens.length} item(ns) à Grande Loja, valor ${formatarMoedaBR(valorTotal)}`,
     })
   } catch (auditError) {
     console.error('Falha ao registrar auditoria (repasse registrado com sucesso):', auditError)

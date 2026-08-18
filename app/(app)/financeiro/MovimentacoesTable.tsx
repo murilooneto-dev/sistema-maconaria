@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { cancelarMovimentacao } from './actions'
 import { AnexosExpandable } from '@/components/anexos/AnexosExpandable'
 import type { AnexoItem } from '@/components/anexos/AnexosList'
+import { formatarDataBR, formatarMoedaBR } from '@/lib/format'
 
 type Movimentacao = {
   id: string
@@ -78,7 +79,7 @@ export function MovimentacoesTable({
         <tbody>
           {movimentacoes.map((mov) => (
             <tr key={mov.id} className="border-b border-slate-100 last:border-0">
-              <td className="px-4 py-2">{mov.data}</td>
+              <td className="px-4 py-2">{formatarDataBR(mov.data)}</td>
               <td className={`px-4 py-2 ${mov.tipo === 'ENTRADA' ? 'text-green-700' : 'text-red-700'}`}>
                 {mov.tipo === 'ENTRADA' ? 'Entrada' : 'Saída'}
               </td>
@@ -87,7 +88,7 @@ export function MovimentacoesTable({
               <td className="px-4 py-2">{nomeRelacionado(mov.contas)}</td>
               <td className="px-4 py-2">{nomeRelacionado(mov.formas_pagamento)}</td>
               <td className="px-4 py-2">{nomeRelacionado(mov.membros)}</td>
-              <td className="px-4 py-2">R$ {Number(mov.valor).toFixed(2)}</td>
+              <td className="px-4 py-2">{formatarMoedaBR(Number(mov.valor))}</td>
               <td className="px-4 py-2">
                 {mov.status === 'ATIVO' ? (
                   <span className="text-green-700">Ativa</span>

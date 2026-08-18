@@ -1,6 +1,6 @@
 import type { createSupabaseServerClient } from '@/lib/supabase/server'
 import { calcularArrecadado, calcularPercentual } from '@/lib/domain/campanhas'
-import { formatarDataBR } from '@/lib/format'
+import { formatarDataBR, formatarMoedaBR } from '@/lib/format'
 import type { ResultadoRelatorio } from './tipos'
 
 const STATUS_LABEL: Record<string, string> = {
@@ -39,9 +39,9 @@ export async function buscarRelatorioCampanhas(
       const percentual = calcularPercentual(arrecadado, meta)
       return [
         c.titulo,
-        `R$ ${meta.toFixed(2)}`,
-        `R$ ${arrecadado.toFixed(2)}`,
-        `R$ ${Math.max(0, meta - arrecadado).toFixed(2)}`,
+        formatarMoedaBR(meta),
+        formatarMoedaBR(arrecadado),
+        formatarMoedaBR(Math.max(0, meta - arrecadado)),
         `${percentual.toFixed(0)}%`,
         STATUS_LABEL[c.status] ?? c.status,
       ]
@@ -73,8 +73,8 @@ async function buscarRelatorioCampanhaEspecifica(
     titulo: `Campanha: ${campanha.titulo}`,
     subtitulo: campanha.objetivo ?? undefined,
     resumo: [
-      { label: 'Meta', valor: `R$ ${meta.toFixed(2)}` },
-      { label: 'Arrecadado', valor: `R$ ${arrecadado.toFixed(2)}` },
+      { label: 'Meta', valor: formatarMoedaBR(meta) },
+      { label: 'Arrecadado', valor: formatarMoedaBR(arrecadado) },
       { label: 'Percentual', valor: `${calcularPercentual(arrecadado, meta).toFixed(0)}%` },
       { label: 'Status', valor: STATUS_LABEL[campanha.status] ?? campanha.status },
     ],
@@ -85,7 +85,7 @@ async function buscarRelatorioCampanhaEspecifica(
         formatarDataBR(d.data),
         d.doador,
         membro?.nome ?? '-',
-        `R$ ${Number(d.valor).toFixed(2)}`,
+        formatarMoedaBR(Number(d.valor)),
         d.status === 'ATIVO' ? 'Ativa' : 'Cancelada',
       ]
     }),

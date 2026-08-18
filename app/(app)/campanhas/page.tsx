@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { AcessoNegado } from '@/components/AcessoNegado'
 import { calcularArrecadado, calcularPercentual } from '@/lib/domain/campanhas'
+import { formatarMoedaBR } from '@/lib/format'
 
 const STATUS_LABEL: Record<string, string> = {
   EM_ANDAMENTO: 'Em andamento',
@@ -88,15 +89,15 @@ export default async function CampanhasPage() {
                 <dl className="grid grid-cols-3 gap-2 text-xs">
                   <div>
                     <dt className="text-slate-400">Meta</dt>
-                    <dd className="font-medium text-slate-900">R$ {meta.toFixed(2)}</dd>
+                    <dd className="font-medium text-slate-900">{formatarMoedaBR(meta)}</dd>
                   </div>
                   <div>
                     <dt className="text-slate-400">Arrecadado</dt>
-                    <dd className="font-medium text-green-700">R$ {arrecadado.toFixed(2)}</dd>
+                    <dd className="font-medium text-green-700">{formatarMoedaBR(arrecadado)}</dd>
                   </div>
                   <div>
                     <dt className="text-slate-400">Saldo</dt>
-                    <dd className="font-medium text-slate-900">R$ {saldo.toFixed(2)}</dd>
+                    <dd className="font-medium text-slate-900">{formatarMoedaBR(saldo)}</dd>
                   </div>
                 </dl>
               </Link>

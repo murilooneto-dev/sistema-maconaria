@@ -2,7 +2,7 @@
 
 import { Fragment, useActionState, useMemo, useState, useTransition } from 'react'
 import { marcarComoEnviado, marcarItensComoJaRepassados } from './actions'
-import { abreviarMes } from '@/lib/format'
+import { abreviarMes, formatarMoedaBR } from '@/lib/format'
 
 type Item = {
   id: string
@@ -54,14 +54,14 @@ function competenciasTexto(itens: GrupoMembro['itens']): string {
 function valorTexto(itens: GrupoMembro['itens']): string {
   const total = itens.reduce((s, i) => s + i.valor, 0)
   if (itens.length <= 1) {
-    return `R$ ${total.toFixed(2)}`
+    return formatarMoedaBR(total)
   }
   const primeiro = itens[0].valor
   const uniforme = itens.every((i) => Math.abs(i.valor - primeiro) < 0.005)
   if (uniforme) {
-    return `R$ ${total.toFixed(2)} (${itens.length}x R$ ${primeiro.toFixed(2)})`
+    return `${formatarMoedaBR(total)} (${itens.length}x ${formatarMoedaBR(primeiro)})`
   }
-  return `R$ ${total.toFixed(2)}`
+  return formatarMoedaBR(total)
 }
 
 function DetalheMembro({ grupo }: { grupo: GrupoMembro }) {
@@ -111,7 +111,7 @@ function DetalheMembro({ grupo }: { grupo: GrupoMembro }) {
               onChange={() => toggle(item.id)}
             />
             <label htmlFor={`ja-repassado-${item.id}`} className="cursor-pointer">
-              {abreviarMes(item.mes)}/{item.ano} — R$ {item.valor.toFixed(2)}
+              {abreviarMes(item.mes)}/{item.ano} — {formatarMoedaBR(item.valor)}
             </label>
           </li>
         ))}
@@ -228,7 +228,7 @@ export function ItensPendentesForm({
       </div>
 
       <p className="text-sm font-medium text-slate-900">
-        {totalItensSelecionados} item(ns) selecionado(s) — Total: R$ {totalSelecionado.toFixed(2)}
+        {totalItensSelecionados} item(ns) selecionado(s) — Total: {formatarMoedaBR(totalSelecionado)}
       </p>
 
       <div className="grid gap-4 sm:grid-cols-3">

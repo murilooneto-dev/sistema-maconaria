@@ -1,5 +1,5 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage } from 'pdf-lib'
-import { formatarDataBR } from '@/lib/format'
+import { formatarDataBR, formatarMoedaBR } from '@/lib/format'
 
 export type ImagemEmbutida = { bytes: Uint8Array; formato: 'png' | 'jpg' }
 
@@ -120,7 +120,7 @@ export async function gerarPdfRecibo(dados: DadosRecibo): Promise<Uint8Array> {
 
   // --- Tabela de dados ---
   y -= 26
-  const valorFormatado = `R$ ${dados.valor.toFixed(2).replace('.', ',')}`
+  const valorFormatado = formatarMoedaBR(dados.valor)
   const tipoLabel = dados.tipo === 'MENSALIDADE' ? 'Mensalidade' : 'Doação (Campanha)'
 
   const linhas: [string, string][] = [

@@ -5,6 +5,7 @@ import { NovaDoacaoForm } from './NovaDoacaoForm'
 import { DoacoesTable } from './DoacoesTable'
 import { StatusCampanhaActions } from './StatusCampanhaActions'
 import { EditarCampanhaForm } from './EditarCampanhaForm'
+import { formatarMoedaBR } from '@/lib/format'
 
 const STATUS_LABEL: Record<string, string> = {
   EM_ANDAMENTO: 'Em andamento',
@@ -76,15 +77,15 @@ export default async function CampanhaDetalhePage({ params }: { params: Promise<
       <dl className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
         <div className="rounded-lg border border-slate-200 bg-white p-4">
           <dt className="text-xs text-slate-500">Meta</dt>
-          <dd className="text-lg font-semibold text-slate-900">R$ {meta.toFixed(2)}</dd>
+          <dd className="text-lg font-semibold text-slate-900">{formatarMoedaBR(meta)}</dd>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-4">
           <dt className="text-xs text-slate-500">Arrecadado</dt>
-          <dd className="text-lg font-semibold text-green-700">R$ {arrecadado.toFixed(2)}</dd>
+          <dd className="text-lg font-semibold text-green-700">{formatarMoedaBR(arrecadado)}</dd>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-4">
           <dt className="text-xs text-slate-500">Saldo</dt>
-          <dd className="text-lg font-semibold text-slate-900">R$ {saldo.toFixed(2)}</dd>
+          <dd className="text-lg font-semibold text-slate-900">{formatarMoedaBR(saldo)}</dd>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-4">
           <dt className="text-xs text-slate-500">Percentual</dt>

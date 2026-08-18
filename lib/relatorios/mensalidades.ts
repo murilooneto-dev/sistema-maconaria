@@ -1,5 +1,6 @@
 import type { createSupabaseServerClient } from '@/lib/supabase/server'
 import { contarCompetenciasVencidasNaoPagas, competenciaVencida } from '@/lib/domain/inadimplencia'
+import { formatarMoedaBR } from '@/lib/format'
 import type { ResultadoRelatorio } from './tipos'
 
 export type FiltrosMensalidades = { situacao?: string }
@@ -36,7 +37,7 @@ export async function buscarRelatorioMensalidades(
       membro.nome,
       membro.situacao === 'ATIVO' ? 'Ativo' : 'Inativo',
       String(vencidas),
-      `R$ ${valorDevido.toFixed(2)}`,
+      formatarMoedaBR(valorDevido),
     ]
   })
 
