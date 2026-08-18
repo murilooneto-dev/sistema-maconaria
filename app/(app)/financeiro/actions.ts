@@ -176,3 +176,169 @@ export async function cancelarMovimentacao(id: string, motivo: string): Promise<
   revalidatePath('/financeiro')
   return {}
 }
+
+export async function editarMovimentacao(
+  _prevState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  let usuario
+  try {
+    usuario = await requireTesoureiro()
+  } catch (err) {
+    return { error: mensagemAutorizacao(err) }
+  }
+
+  const movimentacaoId = String(formData.get('movimentacaoId') ?? '')
+  const data = String(formData.get('data') ?? '')
+  const tipo = String(formData.get('tipo') ?? '')
+  const categoriaId = String(formData.get('categoriaId') ?? '')
+  const descricao = String(formData.get('descricao') ?? '').trim()
+  const valor = Number(formData.get('valor'))
+  const contaId = String(formData.get('contaId') ?? '')
+  const formaPagamentoId = String(formData.get('formaPagamentoId') ?? '')
+  const membroId = String(formData.get('membroId') ?? '') || null
+  const observacao = String(formData.get('observacao') ?? '').trim() || null
+  const motivoEdicao = String(formData.get('motivoEdicao') ?? '').trim()
+
+  if (!movimentacaoId) {
+    return { error: 'Movimentação inválida.' }
+  }
+  if (motivoEdicao.length === 0) {
+    return { error: 'Informe o motivo da edição.' }
+  }
+
+  const validacao = validarMovimentacao({ data, tipo, categoriaId, valor, contaId, formaPagamentoId })
+  if (!validacao.valido) {
+    return { error: validacao.erro }
+  }
+
+  const supabaseAdmin = createSupabaseServiceRoleClient()
+
+  const { data: antiga, error: antigaError } = await supabaseAdmin
+    .from('movimentacoes')
+    .select('id, status, origem, data, tipo, categoria_id, descricao, valor, conta_id, forma_pagamento_id, membro_id')
+    .eq('id', movimentacaoId)
+    .single()
+
+  if (antigaError || !antiga) {
+    return { error: 'Movimentação não encontrada.' }
+  }
+
+  if (antiga.status !== 'ATIVO') {
+    return { error: 'Esta movimentação já foi cancelada ou editada.' }
+  }
+
+  if (antiga.origem === 'MENSALIDADE') {
+    return {
+      error:
+        'Esta movimentação é gerada automaticamente por um pagamento de mensalidade — cancele o pagamento na tela de Mensalidades.',
+    }
+  }
+
+  if (await periodoEstaFechado(supabaseAdmin, antiga.data)) {
+    return { error: 'Não é possível editar: o período desta movimentação já está fechado.' }
+  }
+
+  const { data: categoria } = await supabaseAdmin
+    .from('categorias_movimentacao')
+    .select('id, tipo, sistema, ativo')
+    .eq('id', categoriaId)
+    .single()
+
+  if (!categoria || categoria.tipo !== tipo || categoria.sistema || !categoria.ativo) {
+    return { error: 'Categoria inválida para este tipo de lançamento.' }
+  }
+
+  const { data: nova, error: novaError } = await supabaseAdmin
+    .from('movimentacoes')
+    .insert({
+      data,
+      tipo,
+      categoria_id: categoriaId,
+      descricao: descricao || null,
+      valor,
+      conta_id: contaId,
+      forma_pagamento_id: formaPagamentoId,
+      membro_id: membroId,
+      usuario_id: usuario.id,
+      origem: 'MANUAL',
+      observacao,
+      editada_de_id: antiga.id,
+    })
+    .select('id')
+    .single()
+
+  if (novaError || !nova) {
+    return { error: `Falha ao registrar movimentação corrigida: ${novaError?.message ?? 'erro desconhecido'}` }
+  }
+
+  const { data: canceladaAntiga, error: cancelarError } = await supabaseAdmin
+    .from('movimentacoes')
+    .update({
+      status: 'CANCELADO',
+      motivo_cancelamento: `Editada — substituída pela movimentação ${nova.id}. Motivo: ${motivoEdicao}`,
+      cancelado_por: usuario.id,
+      cancelado_em: new Date().toISOString(),
+    })
+    .eq('id', antiga.id)
+    .eq('status', 'ATIVO')
+    .select('id')
+    .maybeSingle()
+
+  if (cancelarError || !canceladaAntiga) {
+    // Compensa: a antiga não pôde ser cancelada (provável concorrência) —
+    // remove a nova pra não deixar duplicidade.
+    await supabaseAdmin.from('movimentacoes').delete().eq('id', nova.id)
+    return { error: 'Esta movimentação foi alterada por outra operação simultânea. Tente novamente.' }
+  }
+
+  try {
+    await registrarAuditoria({
+      usuarioId: usuario.id,
+      modulo: 'financeiro',
+      acao: 'EDICAO_MOVIMENTACAO',
+      registroTabela: 'movimentacoes',
+      registroId: nova.id,
+      dadosAnteriores: {
+        id: antiga.id,
+        data: antiga.data,
+        tipo: antiga.tipo,
+        categoriaId: antiga.categoria_id,
+        descricao: antiga.descricao,
+        valor: antiga.valor,
+        contaId: antiga.conta_id,
+        formaPagamentoId: antiga.forma_pagamento_id,
+        membroId: antiga.membro_id,
+      },
+      dadosNovos: {
+        movimentacaoAntigaId: antiga.id,
+        movimentacaoNovaId: nova.id,
+        data,
+        tipo,
+        categoriaId,
+        descricao,
+        valor,
+        contaId,
+        formaPagamentoId,
+        membroId,
+        motivoEdicao,
+      },
+      descricao: `Edição da movimentação ${antiga.id} (substituída por ${nova.id})`,
+    })
+  } catch (auditError) {
+    console.error('Falha ao registrar auditoria (movimentação editada com sucesso):', auditError)
+  }
+
+  const { erros: errosAnexos } = await uploadAnexosDoFormulario(supabaseAdmin, formData, 'anexos', {
+    entidadeTipo: 'MOVIMENTACAO',
+    entidadeId: nova.id,
+    enviadoPor: usuario.id,
+  })
+
+  revalidatePath('/financeiro')
+
+  if (errosAnexos.length > 0) {
+    return { success: `Movimentação editada com sucesso. Falha ao anexar arquivo(s): ${errosAnexos.join(' ')}` }
+  }
+  return { success: 'Movimentação editada com sucesso.' }
+}
