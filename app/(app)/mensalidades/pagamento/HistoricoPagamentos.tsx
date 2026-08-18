@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { cancelarPagamento } from './actions'
 import { AnexosExpandable } from '@/components/anexos/AnexosExpandable'
 import type { AnexoItem } from '@/components/anexos/AnexosList'
+import { formatarDataBR, formatarMoedaBR } from '@/lib/format'
 
 type Pagamento = {
   id: string
@@ -26,7 +27,7 @@ export function HistoricoPagamentos({
   const [feedback, setFeedback] = useState<{ id: string; message: string; isError: boolean } | null>(null)
 
   function handleCancelar(pagamento: Pagamento) {
-    const motivo = window.prompt(`Motivo do cancelamento do pagamento de ${new Date(pagamento.data_pagamento).toLocaleDateString('pt-BR')}:`)
+    const motivo = window.prompt(`Motivo do cancelamento do pagamento de ${formatarDataBR(pagamento.data_pagamento)}:`)
     if (!motivo) {
       return
     }
@@ -60,9 +61,9 @@ export function HistoricoPagamentos({
         <tbody>
           {pagamentos.map((pagamento) => (
             <tr key={pagamento.id} className="border-b border-slate-100 last:border-0">
-              <td className="px-4 py-2">{new Date(pagamento.data_pagamento).toLocaleDateString('pt-BR')}</td>
+              <td className="px-4 py-2">{formatarDataBR(pagamento.data_pagamento)}</td>
               <td className="px-4 py-2">
-                {pagamento.valor_total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                {formatarMoedaBR(pagamento.valor_total)}
               </td>
               <td className="px-4 py-2">
                 <span className={pagamento.status === 'ATIVO' ? 'text-green-700' : 'text-slate-400'}>

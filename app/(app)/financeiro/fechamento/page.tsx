@@ -11,6 +11,7 @@ import {
 } from '@/lib/financeiro/fechamento'
 import { FecharPeriodoButton } from './FecharPeriodoButton'
 import { HistoricoFechamentos } from './HistoricoFechamentos'
+import { formatarMoedaBR } from '@/lib/format'
 
 function proximoMes(ano: number, mes: number): { ano: number; mes: number } {
   return mes === 12 ? { ano: ano + 1, mes: 1 } : { ano, mes: mes + 1 }
@@ -86,23 +87,23 @@ export default async function FechamentoPage() {
         <dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <div>
             <dt className="text-xs text-slate-500">Saldo inicial</dt>
-            <dd className="text-lg font-semibold text-slate-900">R$ {saldoInicial.toFixed(2)}</dd>
+            <dd className="text-lg font-semibold text-slate-900">{formatarMoedaBR(saldoInicial)}</dd>
           </div>
           <div>
             <dt className="text-xs text-slate-500">Entradas</dt>
-            <dd className="text-lg font-semibold text-green-700">R$ {totalEntradas.toFixed(2)}</dd>
+            <dd className="text-lg font-semibold text-green-700">{formatarMoedaBR(totalEntradas)}</dd>
           </div>
           <div>
             <dt className="text-xs text-slate-500">Saídas</dt>
-            <dd className="text-lg font-semibold text-red-700">R$ {totalSaidas.toFixed(2)}</dd>
+            <dd className="text-lg font-semibold text-red-700">{formatarMoedaBR(totalSaidas)}</dd>
           </div>
           <div>
             <dt className="text-xs text-slate-500">Transferências (volume)</dt>
-            <dd className="text-lg font-semibold text-slate-900">R$ {totalTransferencias.toFixed(2)}</dd>
+            <dd className="text-lg font-semibold text-slate-900">{formatarMoedaBR(totalTransferencias)}</dd>
           </div>
           <div>
             <dt className="text-xs text-slate-500">Saldo final</dt>
-            <dd className="text-lg font-semibold text-slate-900">R$ {saldoFinal.toFixed(2)}</dd>
+            <dd className="text-lg font-semibold text-slate-900">{formatarMoedaBR(saldoFinal)}</dd>
           </div>
         </dl>
         <div className="mt-4">

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { atualizarMembro } from '../actions'
+import { formatarDataBR } from '@/lib/format'
 
 type Membro = {
   id: string
@@ -178,7 +179,7 @@ export function MembroDetalhe({ membro, isAdmin }: { membro: Membro; isAdmin: bo
             <div>
               <dt className="text-slate-500">Cadastrado em</dt>
               <dd className="font-medium text-slate-900">
-                {new Date(membro.data_cadastro).toLocaleDateString('pt-BR')}
+                {formatarDataBR(membro.data_cadastro)}
               </dd>
             </div>
             <div className="col-span-2">

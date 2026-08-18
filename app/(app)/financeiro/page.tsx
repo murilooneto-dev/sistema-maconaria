@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { AcessoNegado } from '@/components/AcessoNegado'
 import { FinanceiroTabs } from './FinanceiroTabs'
 import { MovimentacoesTable } from './MovimentacoesTable'
+import { formatarMoedaBR } from '@/lib/format'
 
 type SearchParams = {
   dataInicio?: string
@@ -165,15 +166,15 @@ export default async function FinanceiroPage({
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="rounded-lg border border-slate-200 bg-white p-4">
           <p className="text-xs text-slate-500">Total entradas (ativas)</p>
-          <p className="text-lg font-semibold text-green-700">R$ {totalEntradas.toFixed(2)}</p>
+          <p className="text-lg font-semibold text-green-700">{formatarMoedaBR(totalEntradas)}</p>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-4">
           <p className="text-xs text-slate-500">Total saídas (ativas)</p>
-          <p className="text-lg font-semibold text-red-700">R$ {totalSaidas.toFixed(2)}</p>
+          <p className="text-lg font-semibold text-red-700">{formatarMoedaBR(totalSaidas)}</p>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-4">
           <p className="text-xs text-slate-500">Saldo do período filtrado</p>
-          <p className="text-lg font-semibold text-slate-900">R$ {(totalEntradas - totalSaidas).toFixed(2)}</p>
+          <p className="text-lg font-semibold text-slate-900">{formatarMoedaBR(totalEntradas - totalSaidas)}</p>
         </div>
       </div>
 

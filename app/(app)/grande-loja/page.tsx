@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { AcessoNegado } from '@/components/AcessoNegado'
 import { calcularTotal, MOTIVO_JA_REPASSADO } from '@/lib/domain/grande-loja'
+import { formatarMoedaBR } from '@/lib/format'
 import { ItensPendentesForm } from './ItensPendentesForm'
 import { HistoricoRepasses } from './HistoricoRepasses'
 import { JaRepassadosList } from './JaRepassadosList'
@@ -114,11 +115,11 @@ export default async function GrandeLojaPage({
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-4">
           <dt className="text-xs text-slate-500">Total a enviar</dt>
-          <dd className="text-lg font-semibold text-amber-700">R$ {totalPendente.toFixed(2)}</dd>
+          <dd className="text-lg font-semibold text-amber-700">{formatarMoedaBR(totalPendente)}</dd>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-4">
           <dt className="text-xs text-slate-500">Enviados (filtro atual)</dt>
-          <dd className="text-lg font-semibold text-green-700">R$ {totalEnviado.toFixed(2)}</dd>
+          <dd className="text-lg font-semibold text-green-700">{formatarMoedaBR(totalEnviado)}</dd>
         </div>
       </dl>
 

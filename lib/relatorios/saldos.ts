@@ -1,5 +1,6 @@
 import type { createSupabaseServerClient } from '@/lib/supabase/server'
 import { calcularSaldoConta } from '@/lib/domain/financeiro'
+import { formatarMoedaBR } from '@/lib/format'
 import type { ResultadoRelatorio } from './tipos'
 
 export async function buscarRelatorioSaldos(
@@ -35,16 +36,16 @@ export async function buscarRelatorioSaldos(
     linhas.push([
       conta.nome,
       conta.ativo ? 'Ativa' : 'Inativa',
-      `R$ ${Number(conta.saldo_inicial).toFixed(2)}`,
-      `R$ ${totalEntradas.toFixed(2)}`,
-      `R$ ${totalSaidas.toFixed(2)}`,
-      `R$ ${saldo.toFixed(2)}`,
+      formatarMoedaBR(Number(conta.saldo_inicial)),
+      formatarMoedaBR(totalEntradas),
+      formatarMoedaBR(totalSaidas),
+      formatarMoedaBR(saldo),
     ])
   }
 
   return {
     titulo: 'Saldos por conta',
-    resumo: [{ label: 'Saldo consolidado', valor: `R$ ${somaSaldo.toFixed(2)}` }],
+    resumo: [{ label: 'Saldo consolidado', valor: formatarMoedaBR(somaSaldo) }],
     colunas: ['Conta', 'Situação', 'Saldo inicial', 'Entradas', 'Saídas', 'Saldo atual'],
     linhas,
   }

@@ -2,7 +2,7 @@
 
 import { useActionState } from 'react'
 import { gerarRecibo } from '../actions'
-import { formatarDataBR } from '@/lib/format'
+import { formatarDataBR, formatarMoedaBR } from '@/lib/format'
 
 type Pagamento = { id: string; valor_total: number; data_pagamento: string }
 type Doacao = { id: string; doador: string; valor: number; data: string }
@@ -33,13 +33,13 @@ export function GerarReciboForm({
           ? pagamentos.map((p) => (
               <label key={p.id} className="flex items-center gap-2 text-sm">
                 <input type="radio" name="pagamentoId" value={p.id} required />
-                {formatarDataBR(p.data_pagamento)} — R$ {Number(p.valor_total).toFixed(2)}
+                {formatarDataBR(p.data_pagamento)} — {formatarMoedaBR(Number(p.valor_total))}
               </label>
             ))
           : doacoes.map((d) => (
               <label key={d.id} className="flex items-center gap-2 text-sm">
                 <input type="radio" name="doacaoId" value={d.id} required />
-                {formatarDataBR(d.data)} — {d.doador} — R$ {Number(d.valor).toFixed(2)}
+                {formatarDataBR(d.data)} — {d.doador} — {formatarMoedaBR(Number(d.valor))}
               </label>
             ))}
       </div>

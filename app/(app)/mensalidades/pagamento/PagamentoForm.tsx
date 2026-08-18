@@ -2,6 +2,7 @@
 
 import { useActionState } from 'react'
 import { registrarPagamento } from './actions'
+import { formatarMoedaBR } from '@/lib/format'
 
 type Competencia = {
   id: string
@@ -56,9 +57,9 @@ export function PagamentoForm({
                   {String(c.mes).padStart(2, '0')}/{c.ano}
                 </td>
                 <td className="py-2">
-                  {c.valor_devido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  {formatarMoedaBR(c.valor_devido)}
                 </td>
-                <td className="py-2">{c.saldo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                <td className="py-2">{formatarMoedaBR(c.saldo)}</td>
                 <td className="py-2">
                   <input
                     type="number"

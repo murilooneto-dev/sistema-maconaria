@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { cancelarTransferencia } from './actions'
+import { formatarDataBR, formatarMoedaBR } from '@/lib/format'
 
 type Transferencia = {
   id: string
@@ -65,10 +66,10 @@ export function TransferenciasTable({
         <tbody>
           {transferencias.map((t) => (
             <tr key={t.id} className="border-b border-slate-100 last:border-0">
-              <td className="px-4 py-2">{t.data}</td>
+              <td className="px-4 py-2">{formatarDataBR(t.data)}</td>
               <td className="px-4 py-2">{nomeRelacionado(t.conta_origem)}</td>
               <td className="px-4 py-2">{nomeRelacionado(t.conta_destino)}</td>
-              <td className="px-4 py-2">R$ {Number(t.valor).toFixed(2)}</td>
+              <td className="px-4 py-2">{formatarMoedaBR(Number(t.valor))}</td>
               <td className="px-4 py-2">
                 {t.status === 'ATIVO' ? (
                   <span className="text-green-700">Ativa</span>

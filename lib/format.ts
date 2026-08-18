@@ -11,3 +11,9 @@ const MESES_ABREVIADOS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago'
 export function abreviarMes(mes: number): string {
   return MESES_ABREVIADOS[mes - 1] ?? String(mes)
 }
+
+/** Formata um valor numérico para moeda BR: `R$ 1.234,56`. */
+export function formatarMoedaBR(valor: number | null | undefined): string {
+  const numero = valor ?? 0
+  return numero.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}

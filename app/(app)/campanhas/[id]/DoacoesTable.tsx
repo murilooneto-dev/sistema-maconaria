@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { cancelarDoacao } from './actions'
+import { formatarDataBR, formatarMoedaBR } from '@/lib/format'
 
 type Doacao = {
   id: string
@@ -59,10 +60,10 @@ export function DoacoesTable({ doacoes, podeEditar }: { doacoes: Doacao[]; podeE
         <tbody>
           {doacoes.map((d) => (
             <tr key={d.id} className="border-b border-slate-100 last:border-0">
-              <td className="px-4 py-2">{d.data}</td>
+              <td className="px-4 py-2">{formatarDataBR(d.data)}</td>
               <td className="px-4 py-2">{d.doador}</td>
               <td className="px-4 py-2">{nomeMembro(d.membros)}</td>
-              <td className="px-4 py-2">R$ {Number(d.valor).toFixed(2)}</td>
+              <td className="px-4 py-2">{formatarMoedaBR(Number(d.valor))}</td>
               <td className="px-4 py-2">
                 {d.status === 'ATIVO' ? (
                   <span className="text-green-700">Ativa</span>

@@ -1,5 +1,5 @@
 import type { createSupabaseServerClient } from '@/lib/supabase/server'
-import { formatarDataBR } from '@/lib/format'
+import { formatarDataBR, formatarMoedaBR } from '@/lib/format'
 import type { ResultadoRelatorio } from './tipos'
 
 export type FiltrosFinanceiro = {
@@ -56,9 +56,9 @@ export async function buscarRelatorioFinanceiro(
   return {
     titulo: 'Movimentação de entradas e saídas',
     resumo: [
-      { label: 'Entradas', valor: `R$ ${totalEntradas.toFixed(2)}` },
-      { label: 'Saídas', valor: `R$ ${totalSaidas.toFixed(2)}` },
-      { label: 'Saldo do período', valor: `R$ ${(totalEntradas - totalSaidas).toFixed(2)}` },
+      { label: 'Entradas', valor: formatarMoedaBR(totalEntradas) },
+      { label: 'Saídas', valor: formatarMoedaBR(totalSaidas) },
+      { label: 'Saldo do período', valor: formatarMoedaBR(totalEntradas - totalSaidas) },
     ],
     colunas: ['Data', 'Tipo', 'Categoria', 'Descrição', 'Conta', 'Forma', 'Membro', 'Campanha', 'Valor'],
     linhas: (movimentacoes ?? []).map((m) => [
@@ -70,7 +70,7 @@ export async function buscarRelatorioFinanceiro(
       nome(m.formas_pagamento),
       nome(m.membros),
       titulo(m.campanhas),
-      `R$ ${Number(m.valor).toFixed(2)}`,
+      formatarMoedaBR(Number(m.valor)),
     ]),
   }
 }

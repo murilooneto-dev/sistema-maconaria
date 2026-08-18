@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { reabrirPeriodo } from './actions'
+import { formatarMoedaBR } from '@/lib/format'
 
 type Fechamento = {
   id: string
@@ -71,10 +72,10 @@ export function HistoricoFechamentos({
               <td className="px-4 py-2">
                 {String(f.mes).padStart(2, '0')}/{f.ano}
               </td>
-              <td className="px-4 py-2">R$ {Number(f.saldo_inicial).toFixed(2)}</td>
-              <td className="px-4 py-2 text-green-700">R$ {Number(f.total_entradas).toFixed(2)}</td>
-              <td className="px-4 py-2 text-red-700">R$ {Number(f.total_saidas).toFixed(2)}</td>
-              <td className="px-4 py-2">R$ {Number(f.saldo_final).toFixed(2)}</td>
+              <td className="px-4 py-2">{formatarMoedaBR(Number(f.saldo_inicial))}</td>
+              <td className="px-4 py-2 text-green-700">{formatarMoedaBR(Number(f.total_entradas))}</td>
+              <td className="px-4 py-2 text-red-700">{formatarMoedaBR(Number(f.total_saidas))}</td>
+              <td className="px-4 py-2">{formatarMoedaBR(Number(f.saldo_final))}</td>
               <td className="px-4 py-2">
                 {f.status === 'FECHADO' ? (
                   <span className="text-green-700">Fechado</span>

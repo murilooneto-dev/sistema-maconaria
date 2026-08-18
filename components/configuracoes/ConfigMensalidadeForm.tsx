@@ -2,6 +2,7 @@
 
 import { useActionState } from 'react'
 import { salvarConfigMensalidade } from '@/app/(app)/configuracoes/mensalidades/actions'
+import { formatarDataBR, formatarMoedaBR } from '@/lib/format'
 
 type ConfigHistorico = {
   id: string
@@ -30,19 +31,13 @@ export function ConfigMensalidadeForm({
             <div>
               <dt className="text-slate-500">Valor da mensalidade</dt>
               <dd className="font-medium text-slate-900">
-                {atual.valor_mensalidade.toLocaleString('pt-BR', {
-                  style: 'currency',
-                  currency: 'BRL',
-                })}
+                {formatarMoedaBR(atual.valor_mensalidade)}
               </dd>
             </div>
             <div>
               <dt className="text-slate-500">Valor Grande Loja</dt>
               <dd className="font-medium text-slate-900">
-                {atual.valor_grande_loja.toLocaleString('pt-BR', {
-                  style: 'currency',
-                  currency: 'BRL',
-                })}
+                {formatarMoedaBR(atual.valor_grande_loja)}
               </dd>
             </div>
           </dl>
@@ -127,19 +122,13 @@ export function ConfigMensalidadeForm({
               {historico.map((item) => (
                 <tr key={item.id} className="border-b border-slate-100 last:border-0">
                   <td className="px-4 py-2 text-slate-500">
-                    {new Date(item.vigente_desde).toLocaleDateString('pt-BR')}
+                    {formatarDataBR(item.vigente_desde.split('T')[0])}
                   </td>
                   <td className="px-4 py-2">
-                    {item.valor_mensalidade.toLocaleString('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL',
-                    })}
+                    {formatarMoedaBR(item.valor_mensalidade)}
                   </td>
                   <td className="px-4 py-2">
-                    {item.valor_grande_loja.toLocaleString('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL',
-                    })}
+                    {formatarMoedaBR(item.valor_grande_loja)}
                   </td>
                 </tr>
               ))}

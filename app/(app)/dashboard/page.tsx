@@ -2,12 +2,8 @@ import Link from 'next/link'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { AcessoNegado } from '@/components/AcessoNegado'
 import { buscarDadosDashboard } from '@/lib/dashboard/dados'
-import { formatarDataBR } from '@/lib/format'
+import { formatarDataBR, formatarMoedaBR } from '@/lib/format'
 import { GraficoEntradasSaidas } from './GraficoEntradasSaidas'
-
-function moeda(valor: number): string {
-  return `R$ ${valor.toFixed(2)}`
-}
 
 export default async function DashboardPage({
   searchParams,
@@ -74,15 +70,15 @@ export default async function DashboardPage({
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-4">
           <dt className="text-xs text-slate-500">Entradas do período</dt>
-          <dd className="text-lg font-semibold text-green-700">{moeda(dados.entradasPeriodo)}</dd>
+          <dd className="text-lg font-semibold text-green-700">{formatarMoedaBR(dados.entradasPeriodo)}</dd>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-4">
           <dt className="text-xs text-slate-500">Saídas do período</dt>
-          <dd className="text-lg font-semibold text-red-700">{moeda(dados.saidasPeriodo)}</dd>
+          <dd className="text-lg font-semibold text-red-700">{formatarMoedaBR(dados.saidasPeriodo)}</dd>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-4 sm:col-span-2">
           <dt className="text-xs text-slate-500">Saldo consolidado</dt>
-          <dd className="text-lg font-semibold text-slate-900">{moeda(dados.saldoConsolidado)}</dd>
+          <dd className="text-lg font-semibold text-slate-900">{formatarMoedaBR(dados.saldoConsolidado)}</dd>
         </div>
       </dl>
 
@@ -101,7 +97,7 @@ export default async function DashboardPage({
               {dados.saldosPorConta.map((c) => (
                 <li key={c.nome} className="flex items-center justify-between">
                   <span className="text-slate-700">{c.nome}</span>
-                  <span className="font-medium text-slate-900">{moeda(c.saldo)}</span>
+                  <span className="font-medium text-slate-900">{formatarMoedaBR(c.saldo)}</span>
                 </li>
               ))}
             </ul>
@@ -133,7 +129,7 @@ export default async function DashboardPage({
                     <div className="h-full rounded-full bg-slate-900" style={{ width: `${c.percentual}%` }} />
                   </div>
                   <p className="mt-1 text-xs text-slate-500">
-                    {moeda(c.arrecadado)} de {moeda(c.meta)}
+                    {formatarMoedaBR(c.arrecadado)} de {formatarMoedaBR(c.meta)}
                   </p>
                 </li>
               ))}
@@ -160,7 +156,7 @@ export default async function DashboardPage({
                   </div>
                   <span className={m.tipo === 'ENTRADA' ? 'font-medium text-green-700' : 'font-medium text-red-700'}>
                     {m.tipo === 'ENTRADA' ? '+' : '-'}
-                    {moeda(m.valor)}
+                    {formatarMoedaBR(m.valor)}
                   </span>
                 </li>
               ))}
