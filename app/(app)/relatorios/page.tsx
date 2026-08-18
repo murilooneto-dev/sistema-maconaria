@@ -5,6 +5,7 @@ const RELATORIOS = [
   { titulo: 'Resumo geral de campanhas', href: '/relatorios/campanhas' },
   { titulo: 'Resumo de campanha específica', href: '/relatorios/campanhas?modo=especifica' },
   { titulo: 'Movimentação de entradas e saídas', href: '/relatorios/financeiro' },
+  { titulo: 'Balancete financeiro (analítico)', href: '/relatorios/balancete' },
   { titulo: 'Relatório Grande Loja', href: '/relatorios/grande-loja' },
   { titulo: 'Saldos por conta', href: '/relatorios/saldos' },
   { titulo: 'Mensalidades / Inadimplência', href: '/relatorios/mensalidades' },
