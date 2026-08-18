@@ -120,7 +120,8 @@ export async function buscarBalancete(
   if (filtros.dataInicio) query = query.gte('data', filtros.dataInicio)
   if (filtros.dataFim) query = query.lte('data', filtros.dataFim)
 
-  const { data } = await query
+  const { data, error } = await query
+  if (error) throw error
 
   return agruparMovimentacoesEmBalancete((data ?? []) as unknown as MovimentacaoBrutaBalancete[])
 }
