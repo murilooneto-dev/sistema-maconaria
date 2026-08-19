@@ -49,10 +49,10 @@ export default async function EditarMovimentacaoPage({
       <h1 className="text-lg font-semibold text-slate-900">Financeiro</h1>
       <FinanceiroTabs />
 
-      {!movimentacao || movimentacao.status !== 'ATIVO' || movimentacao.origem === 'MENSALIDADE' ? (
+      {!movimentacao || movimentacao.status !== 'ATIVO' || movimentacao.origem !== 'MANUAL' ? (
         <p className="text-sm text-red-600">
           Esta movimentação não pode ser editada (não encontrada, já cancelada, ou gerada automaticamente por um
-          pagamento de mensalidade).
+          pagamento de mensalidade, doação de campanha ou repasse à Grande Loja).
         </p>
       ) : (
         <NovaMovimentacaoForm
