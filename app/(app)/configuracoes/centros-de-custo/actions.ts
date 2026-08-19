@@ -130,6 +130,16 @@ export async function atualizarCategoriasDoCentro(id: string, categoriaIds: stri
 
   const supabaseAdmin = createSupabaseServiceRoleClient()
 
+  const { data: centro } = await supabaseAdmin
+    .from('centros_de_custo')
+    .select('id')
+    .eq('id', id)
+    .single()
+
+  if (!centro) {
+    return { error: 'Centro de custo não encontrado.' }
+  }
+
   const { data: anteriores } = await supabaseAdmin
     .from('centros_de_custo_categorias')
     .select('categoria_id')
