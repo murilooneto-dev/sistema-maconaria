@@ -216,7 +216,7 @@ export async function editarMovimentacao(
 
   const { data: antiga, error: antigaError } = await supabaseAdmin
     .from('movimentacoes')
-    .select('id, status, origem, data, tipo, categoria_id, descricao, valor, conta_id, forma_pagamento_id, membro_id')
+    .select('id, status, origem, data, tipo, categoria_id, descricao, valor, conta_id, forma_pagamento_id, membro_id, observacao')
     .eq('id', movimentacaoId)
     .single()
 
@@ -232,6 +232,20 @@ export async function editarMovimentacao(
     return {
       error:
         'Esta movimentação é gerada automaticamente por um pagamento de mensalidade — cancele o pagamento na tela de Mensalidades.',
+    }
+  }
+
+  if (antiga.origem === 'CAMPANHA') {
+    return {
+      error:
+        'Esta movimentação é gerada automaticamente por uma doação de campanha — cancele a doação na tela de Campanhas.',
+    }
+  }
+
+  if (antiga.origem === 'GRANDE_LOJA') {
+    return {
+      error:
+        'Esta movimentação é gerada automaticamente por um repasse à Grande Loja — cancele o repasse na tela de Grande Loja.',
     }
   }
 
@@ -285,10 +299,34 @@ export async function editarMovimentacao(
     .select('id')
     .maybeSingle()
 
-  if (cancelarError || !canceladaAntiga) {
-    // Compensa: a antiga não pôde ser cancelada (provável concorrência) —
+  if (cancelarError) {
+    // Erro real do Postgres (ex.: trigger de período fechado, constraint, etc.)
+    console.error(`Falha ao cancelar a movimentação ${antiga.id} durante edição: ${cancelarError.message}`)
+    // Tenta desfazer a nova movimentação criada
+    const { error: deleteError } = await supabaseAdmin.from('movimentacoes').delete().eq('id', nova.id)
+    if (deleteError) {
+      console.error(
+        `Falha ao desfazer a movimentação ${nova.id} após não conseguir cancelar a movimentação ${antiga.id} — requer correção manual imediata (pode haver duas movimentações ATIVO para o mesmo lançamento).`
+      )
+      return {
+        error: `Falha ao editar a movimentação. Contate o suporte para conferência manual (movimentações ${antiga.id} e ${nova.id}).`,
+      }
+    }
+    return { error: 'Falha ao processar a edição. Tente novamente.' }
+  }
+
+  if (!canceladaAntiga) {
+    // Compensa: a antiga não pôde ser cancelada por concorrência (outro usuário/thread a alterou) —
     // remove a nova pra não deixar duplicidade.
-    await supabaseAdmin.from('movimentacoes').delete().eq('id', nova.id)
+    const { error: deleteError } = await supabaseAdmin.from('movimentacoes').delete().eq('id', nova.id)
+    if (deleteError) {
+      console.error(
+        `Falha ao desfazer a movimentação ${nova.id} após não conseguir cancelar a movimentação ${antiga.id} — requer correção manual imediata (pode haver duas movimentações ATIVO para o mesmo lançamento).`
+      )
+      return {
+        error: `Falha ao editar a movimentação. Contate o suporte para conferência manual (movimentações ${antiga.id} e ${nova.id}).`,
+      }
+    }
     return { error: 'Esta movimentação foi alterada por outra operação simultânea. Tente novamente.' }
   }
 
@@ -309,6 +347,8 @@ export async function editarMovimentacao(
         contaId: antiga.conta_id,
         formaPagamentoId: antiga.forma_pagamento_id,
         membroId: antiga.membro_id,
+        observacao: antiga.observacao,
+        origem: antiga.origem,
       },
       dadosNovos: {
         movimentacaoAntigaId: antiga.id,
@@ -321,6 +361,7 @@ export async function editarMovimentacao(
         contaId,
         formaPagamentoId,
         membroId,
+        observacao,
         motivoEdicao,
       },
       descricao: `Edição da movimentação ${antiga.id} (substituída por ${nova.id})`,
