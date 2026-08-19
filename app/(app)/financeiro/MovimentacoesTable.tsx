@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import Link from 'next/link'
 import { cancelarMovimentacao } from './actions'
 import { AnexosExpandable } from '@/components/anexos/AnexosExpandable'
 import type { AnexoItem } from '@/components/anexos/AnexosList'
@@ -104,14 +105,19 @@ export function MovimentacoesTable({
               {podeEditar && (
                 <td className="px-4 py-2">
                   {mov.status === 'ATIVO' && mov.origem !== 'MENSALIDADE' && (
-                    <button
-                      type="button"
-                      disabled={isPending}
-                      onClick={() => handleCancelar(mov)}
-                      className="text-slate-700 underline disabled:opacity-50"
-                    >
-                      Cancelar
-                    </button>
+                    <>
+                      <Link href={`/financeiro/${mov.id}/editar`} className="mr-3 text-slate-700 underline">
+                        Editar
+                      </Link>
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => handleCancelar(mov)}
+                        className="text-slate-700 underline disabled:opacity-50"
+                      >
+                        Cancelar
+                      </button>
+                    </>
                   )}
                   {mov.status === 'ATIVO' && mov.origem === 'MENSALIDADE' && (
                     <span className="text-xs text-slate-400">via Mensalidades</span>

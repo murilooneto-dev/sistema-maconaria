@@ -1,30 +1,49 @@
 'use client'
 
 import { useActionState, useState } from 'react'
-import { registrarMovimentacao } from '../actions'
+import { registrarMovimentacao, editarMovimentacao } from '../actions'
 
 type Categoria = { id: string; nome: string; tipo: string }
 type Opcao = { id: string; nome: string }
+
+type ValoresIniciais = {
+  data: string
+  tipo: string
+  categoriaId: string
+  descricao: string
+  valor: number
+  contaId: string
+  formaPagamentoId: string
+  membroId: string
+  observacao: string
+}
 
 export function NovaMovimentacaoForm({
   categorias,
   contas,
   formasPagamento,
   membros,
+  modoEdicao,
 }: {
   categorias: Categoria[]
   contas: Opcao[]
   formasPagamento: Opcao[]
   membros: Opcao[]
+  modoEdicao?: { movimentacaoId: string; valoresIniciais: ValoresIniciais }
 }) {
-  const [state, formAction, pending] = useActionState(registrarMovimentacao, undefined)
-  const [tipo, setTipo] = useState('ENTRADA')
+  const action = modoEdicao ? editarMovimentacao : registrarMovimentacao
+  const [state, formAction, pending] = useActionState(action, undefined)
+  const [tipo, setTipo] = useState(modoEdicao?.valoresIniciais.tipo ?? 'ENTRADA')
 
   const categoriasDoTipo = categorias.filter((c) => c.tipo === tipo)
 
   return (
     <form action={formAction} className="max-w-xl space-y-4 rounded-lg border border-slate-200 bg-white p-6">
-      <h2 className="text-sm font-semibold text-slate-900">Nova movimentação</h2>
+      <h2 className="text-sm font-semibold text-slate-900">
+        {modoEdicao ? 'Editar movimentação' : 'Nova movimentação'}
+      </h2>
+
+      {modoEdicao && <input type="hidden" name="movimentacaoId" value={modoEdicao.movimentacaoId} />}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1">
@@ -51,6 +70,7 @@ export function NovaMovimentacaoForm({
             id="categoriaId"
             name="categoriaId"
             required
+            defaultValue={modoEdicao?.valoresIniciais.categoriaId}
             className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
           >
             {categoriasDoTipo.length === 0 && <option value="">Nenhuma categoria disponível</option>}
@@ -71,6 +91,7 @@ export function NovaMovimentacaoForm({
             name="data"
             type="date"
             required
+            defaultValue={modoEdicao?.valoresIniciais.data}
             className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
           />
         </div>
@@ -86,6 +107,7 @@ export function NovaMovimentacaoForm({
             step="0.01"
             min="0.01"
             required
+            defaultValue={modoEdicao?.valoresIniciais.valor}
             className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
           />
         </div>
@@ -98,6 +120,7 @@ export function NovaMovimentacaoForm({
             id="contaId"
             name="contaId"
             required
+            defaultValue={modoEdicao?.valoresIniciais.contaId}
             className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
           >
             {contas.map((c) => (
@@ -116,6 +139,7 @@ export function NovaMovimentacaoForm({
             id="formaPagamentoId"
             name="formaPagamentoId"
             required
+            defaultValue={modoEdicao?.valoresIniciais.formaPagamentoId}
             className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
           >
             {formasPagamento.map((f) => (
@@ -133,6 +157,7 @@ export function NovaMovimentacaoForm({
           <select
             id="membroId"
             name="membroId"
+            defaultValue={modoEdicao?.valoresIniciais.membroId ?? ''}
             className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
           >
             <option value="">-</option>
@@ -152,6 +177,7 @@ export function NovaMovimentacaoForm({
             id="descricao"
             name="descricao"
             type="text"
+            defaultValue={modoEdicao?.valoresIniciais.descricao}
             className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
           />
         </div>
@@ -164,9 +190,26 @@ export function NovaMovimentacaoForm({
             id="observacao"
             name="observacao"
             rows={2}
+            defaultValue={modoEdicao?.valoresIniciais.observacao}
             className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
           />
         </div>
+
+        {modoEdicao && (
+          <div className="space-y-1 sm:col-span-2">
+            <label htmlFor="motivoEdicao" className="text-sm font-medium text-slate-700">
+              Motivo da edição
+            </label>
+            <textarea
+              id="motivoEdicao"
+              name="motivoEdicao"
+              rows={2}
+              required
+              placeholder="Ex.: valor lançado errado, deveria ser R$ 150,00"
+              className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+        )}
 
         <div className="space-y-1 sm:col-span-2">
           <label htmlFor="anexos" className="text-sm font-medium text-slate-700">
@@ -199,7 +242,7 @@ export function NovaMovimentacaoForm({
         disabled={pending}
         className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
       >
-        {pending ? 'Registrando...' : 'Registrar'}
+        {pending ? 'Salvando...' : modoEdicao ? 'Salvar edição' : 'Registrar'}
       </button>
     </form>
   )
