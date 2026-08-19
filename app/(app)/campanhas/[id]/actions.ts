@@ -117,6 +117,7 @@ export async function registrarDoacao(_prevState: ActionState, formData: FormDat
   revalidatePath(`/campanhas/${campanhaId}`)
   revalidatePath('/campanhas')
   revalidatePath('/financeiro')
+  revalidatePath('/financeiro/movimentacoes')
   return { success: 'Doação registrada com sucesso.' }
 }
 
@@ -189,5 +190,6 @@ export async function cancelarDoacao(doacaoId: string, motivo: string): Promise<
   revalidatePath(`/campanhas/${doacao.campanha_id}`)
   revalidatePath('/campanhas')
   revalidatePath('/financeiro')
+  revalidatePath('/financeiro/movimentacoes')
   return {}
 }

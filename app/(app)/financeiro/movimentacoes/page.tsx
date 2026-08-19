@@ -1,7 +1,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { AcessoNegado } from '@/components/AcessoNegado'
-import { FinanceiroTabs } from './FinanceiroTabs'
-import { MovimentacoesTable } from './MovimentacoesTable'
+import { FinanceiroTabs } from '../FinanceiroTabs'
+import { MovimentacoesTable } from '../MovimentacoesTable'
 import { formatarMoedaBR } from '@/lib/format'
 
 type SearchParams = {
@@ -14,7 +14,7 @@ type SearchParams = {
   membroId?: string
 }
 
-export default async function FinanceiroPage({
+export default async function MovimentacoesPage({
   searchParams,
 }: {
   searchParams: Promise<SearchParams>
