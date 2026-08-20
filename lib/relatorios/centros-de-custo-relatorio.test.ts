@@ -134,6 +134,31 @@ describe('detalharCentrosDeCusto', () => {
     const [detalhado] = detalharCentrosDeCusto(centros)
     expect(detalhado.categorias[0].lancamentos.map((l) => l.descricao)).toEqual(['Recente', 'Antigo'])
   })
+
+  it('categorias com mesmo nome mas tipos diferentes (ENTRADA e SAIDA) não são mescladas', () => {
+    const centros = [
+      centro({
+        movimentacoes: [
+          { id: 'm1', data: '2026-08-10', categoria: 'Eventos', descricao: 'Venda de ingressos', valor: 200, tipo: 'ENTRADA' },
+          { id: 'm2', data: '2026-08-11', categoria: 'Eventos', descricao: 'Aluguel de espaço', valor: 80, tipo: 'SAIDA' },
+        ],
+      }),
+    ]
+
+    const [detalhado] = detalharCentrosDeCusto(centros)
+
+    expect(detalhado.categorias).toHaveLength(2)
+
+    const entrada = detalhado.categorias.find((c) => c.nome === 'Eventos' && c.tipo === 'ENTRADA')!
+    expect(entrada).toBeDefined()
+    expect(entrada.total).toBe(200)
+    expect(entrada.lancamentos).toHaveLength(1)
+
+    const saida = detalhado.categorias.find((c) => c.nome === 'Eventos' && c.tipo === 'SAIDA')!
+    expect(saida).toBeDefined()
+    expect(saida.total).toBe(80)
+    expect(saida.lancamentos).toHaveLength(1)
+  })
 })
 
 describe('centrosDeCustoParaResultado', () => {
@@ -164,7 +189,7 @@ describe('centrosDeCustoParaResultado', () => {
     expect(resultado.linhas.some((l) => l[0].includes('— Pag 1'))).toBe(true)
     const linhaLancamento = resultado.linhas.find((l) => l[0].includes('— Pag 1'))!
     expect(linhaLancamento[1]).toBe('10/08/2026')
-    expect(linhaLancamento[2]).toBe(formatarMoedaBR(100))
+    expect(linhaLancamento[2]).toBe(`+${formatarMoedaBR(100)}`)
   })
 
   it('não inclui centro sem nenhuma movimentação no período', () => {

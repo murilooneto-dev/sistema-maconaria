@@ -55,7 +55,11 @@ export function CentrosDeCustoRelatorioTable({ centros }: { centros: CentroDeCus
                           className="cursor-pointer border-b border-slate-100 last:border-0 hover:bg-slate-50"
                         >
                           <td className="px-4 py-2 text-slate-900">{categoria.nome}</td>
-                          <td className="px-4 py-2 text-right">{formatarMoedaBR(categoria.total)}</td>
+                          <td
+                            className={`px-4 py-2 text-right ${categoria.tipo === 'ENTRADA' ? 'text-green-700' : 'text-red-700'}`}
+                          >
+                            {formatarMoedaBR(categoria.total)}
+                          </td>
                         </tr>
                         {categoriaAbertaAqui && (
                           <tr className="border-b border-slate-100 bg-slate-50">
@@ -73,7 +77,11 @@ export function CentrosDeCustoRelatorioTable({ centros }: { centros: CentroDeCus
                                     <tr key={i}>
                                       <td className="py-1 pr-4">{formatarDataBR(lanc.data)}</td>
                                       <td className="py-1 pr-4">{lanc.descricao}</td>
-                                      <td className="py-1 pr-4 text-right">{formatarMoedaBR(lanc.valor)}</td>
+                                      <td
+                                        className={`py-1 pr-4 text-right ${lanc.tipo === 'ENTRADA' ? 'text-green-700' : 'text-red-700'}`}
+                                      >
+                                        {formatarMoedaBR(lanc.valor)}
+                                      </td>
                                     </tr>
                                   ))}
                                 </tbody>

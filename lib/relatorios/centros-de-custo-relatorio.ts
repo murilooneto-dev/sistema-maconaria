@@ -11,7 +11,12 @@ export function filtrarCentroDeCusto(
   return centros.filter((c) => c.id === centroDeCustoId)
 }
 
-export type LancamentoCentroDetalhado = { data: string; descricao: string; valor: number }
+export type LancamentoCentroDetalhado = {
+  data: string
+  descricao: string
+  valor: number
+  tipo: 'ENTRADA' | 'SAIDA'
+}
 
 export type CategoriaCentroDetalhada = {
   nome: string
@@ -36,13 +41,14 @@ export function detalharCentrosDeCusto(centros: CentroDeCustoResumo[]): CentroDe
     const porCategoria = new Map<string, CategoriaCentroDetalhada>()
 
     for (const mov of centro.movimentacoes) {
-      let entry = porCategoria.get(mov.categoria)
+      const chave = `${mov.categoria}__${mov.tipo}`
+      let entry = porCategoria.get(chave)
       if (!entry) {
         entry = { nome: mov.categoria, tipo: mov.tipo, total: 0, lancamentos: [] }
-        porCategoria.set(mov.categoria, entry)
+        porCategoria.set(chave, entry)
       }
       entry.total += mov.valor
-      entry.lancamentos.push({ data: mov.data, descricao: mov.descricao, valor: mov.valor })
+      entry.lancamentos.push({ data: mov.data, descricao: mov.descricao, valor: mov.valor, tipo: mov.tipo })
     }
 
     const categorias = [...porCategoria.values()]
@@ -68,12 +74,18 @@ export function centrosDeCustoParaResultado(centros: CentroDeCustoDetalhado[]): 
   for (const centro of centros) {
     if (centro.categorias.length === 0) continue
 
-    linhas.push([`CENTRO: ${centro.nome.toUpperCase()}`, '', formatarMoedaBR(centro.saldo)])
+    linhas.push([
+      `CENTRO: ${centro.nome.toUpperCase()} — Entradas ${formatarMoedaBR(centro.totalEntradas)} | Saídas ${formatarMoedaBR(centro.totalSaidas)}`,
+      '',
+      formatarMoedaBR(centro.saldo),
+    ])
 
     for (const categoria of centro.categorias) {
-      linhas.push([`${categoria.nome} (subtotal)`, '-', formatarMoedaBR(categoria.total)])
+      const sinalCategoria = categoria.tipo === 'ENTRADA' ? '+' : '-'
+      linhas.push([`${categoria.nome} (subtotal)`, '-', `${sinalCategoria}${formatarMoedaBR(categoria.total)}`])
       for (const lanc of categoria.lancamentos) {
-        linhas.push([`— ${lanc.descricao}`, formatarDataBR(lanc.data), formatarMoedaBR(lanc.valor)])
+        const sinal = lanc.tipo === 'ENTRADA' ? '+' : '-'
+        linhas.push([`— ${lanc.descricao}`, formatarDataBR(lanc.data), `${sinal}${formatarMoedaBR(lanc.valor)}`])
       }
     }
   }
@@ -83,6 +95,8 @@ export function centrosDeCustoParaResultado(centros: CentroDeCustoDetalhado[]): 
 
   return {
     titulo: 'Relatório por centro de custo',
+    subtitulo:
+      'Uma categoria pode pertencer a mais de um centro de custo. A soma dos centros pode ultrapassar o total geral do período.',
     resumo: [
       { label: 'Entradas', valor: formatarMoedaBR(totalEntradas) },
       { label: 'Saídas', valor: formatarMoedaBR(totalSaidas) },
