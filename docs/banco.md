@@ -612,6 +612,65 @@ A soma de `pagamento_mensalidades.valor_aplicado` para uma dada `mensalidade_id`
 
 ---
 
+## Tabela: `centros_de_custo`
+
+**Namespace:** `public.centros_de_custo` · **Migration:** `00000000000029_centros_de_custo.sql`
+
+**Responsabilidade:** Agrupamento de categorias de `movimentacoes` definido pelo usuário em `/configuracoes/centros-de-custo`, usado para organizar o dashboard financeiro ("Visão geral" da tela `/financeiro`) por área/finalidade em vez de por categoria crua.
+
+### Campos
+
+| Campo | Tipo | NOT NULL | Padrão | Descrição |
+|-------|------|----------|--------|-----------|
+| `id` | `uuid` | Sim | `gen_random_uuid()` | PK. |
+| `nome` | `text` | Sim | — | Único. |
+| `cor` | `text` | Sim | `'#64748b'` | Cor usada nos cards do dashboard. |
+| `ativo` | `boolean` | Sim | `true` | Centro desativado sai da "Visão geral" e das listas de vínculo; suas movimentações passam a ser contabilizadas em "Sem centro de custo" (ver `lib/relatorios/centros-de-custo.ts`). |
+| `created_at` / `updated_at` | `timestamptz` | Sim | `now()` | — |
+
+### Constraints
+
+- **Unique:** `nome`.
+
+### RLS
+
+- `centros_de_custo_select_authenticated` (SELECT, `authenticated`, `true`).
+- `centros_de_custo_write_admin` (ALL, `authenticated`, `public.is_admin()`) — só Administrador cadastra/edita/desativa centros de custo (mesmo padrão de `categorias_movimentacao`/`formas_pagamento`).
+
+### Triggers
+
+- `centros_de_custo_set_updated_at` (BEFORE UPDATE) → `public.set_updated_at()`.
+
+---
+
+## Tabela: `centros_de_custo_categorias`
+
+**Namespace:** `public.centros_de_custo_categorias` · **Migration:** `00000000000029_centros_de_custo.sql`
+
+**Responsabilidade:** Vínculo N:N entre `centros_de_custo` e `categorias_movimentacao` — uma categoria pode pertencer a mais de um centro de custo (decisão de produto: os totais dos cards podem então se sobrepor quando houver categorias compartilhadas entre centros; comportamento intencional). Uma categoria sem nenhum vínculo cai em "Sem centro de custo" no dashboard.
+
+### Campos
+
+| Campo | Tipo | NOT NULL | Padrão | Descrição |
+|-------|------|----------|--------|-----------|
+| `centro_de_custo_id` | `uuid` | Sim | — | FK → `centros_de_custo(id)`, `on delete cascade`. Parte da PK composta. |
+| `categoria_id` | `uuid` | Sim | — | FK → `categorias_movimentacao(id)`, `on delete cascade`. Parte da PK composta. |
+
+### Índices
+
+- `centros_de_custo_categorias_categoria_idx` em `categoria_id`.
+
+### Constraints
+
+- **PK composta:** `(centro_de_custo_id, categoria_id)`.
+
+### RLS
+
+- `centros_de_custo_categorias_select_authenticated` (SELECT, `authenticated`, `true`).
+- `centros_de_custo_categorias_write_admin` (ALL, `authenticated`, `public.is_admin()`).
+
+---
+
 ## Tabela: `recibos`
 
 **Namespace:** `public.recibos` · **Migration:** `00000000000011_recibos.sql`
@@ -897,6 +956,7 @@ Migrations SQL são versionadas numericamente sob `supabase/migrations/`:
 - `00000000000023_assinatura_tesoureiro.sql` — `loja_config.assinatura_tesoureiro_url` e `recibos.assinatura_tesoureiro_url`, para o recibo em PDF mostrar as assinaturas do Venerável Mestre e do Tesoureiro lado a lado.
 - `00000000000024_membros_em_iniciacao.sql` — `membros.matricula` deixa de ser `NOT NULL` e ganha a coluna `em_iniciacao` (flag informativa).
 - `00000000000025_anexos_e_observacao.sql` — adiciona `membros.observacao` (texto livre); cria a tabela genérica `anexos` (`entidade_tipo` em `MEMBRO`/`PAGAMENTO`/`MOVIMENTACAO` + `entidade_id`, exclusão lógica via `status`) e o bucket privado `anexos` (`public: false`, 10MB, MIME allowlist), usado por membros, pagamentos de mensalidade e lançamentos financeiros manuais. Sem policies de `select`/`insert`/`delete` em `storage.objects` nem na tabela `anexos` — todo acesso passa por Server Actions com `service_role` (mesmo padrão de `auditoria`), e download é sempre via signed URL de 5 minutos gerada sob demanda (`lib/anexos/signed-url.ts`), nunca um link público persistido.
+- `00000000000029_centros_de_custo.sql` — cria `centros_de_custo` e `centros_de_custo_categorias` (vínculo N:N com `categorias_movimentacao`), usadas pelo dashboard "Visão geral" da tela `/financeiro` e pelo cadastro em `/configuracoes/centros-de-custo`.
 
 `supabase/seed.sql` (não numerado, não é migration) contém dados de desenvolvimento: formas de pagamento padrão e a linha singleton de `loja_config`. Não é aplicado automaticamente em produção.
 

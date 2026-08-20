@@ -142,4 +142,22 @@ describe('agruparMovimentacoesPorCentroDeCusto', () => {
     expect(resultado.find((c) => c.id === SEM_CENTRO_ID)).toBeUndefined()
     expect(resultado.find((c) => c.id === 'centro-1')!.totalEntradas).toBe(0)
   })
+
+  it('roteia para "Sem centro de custo" uma categoria cujo único vínculo era com um centro desativado (contrato do fetch wrapper: vinculos nunca referenciam um id fora de `centros`)', () => {
+    // O fetch wrapper (buscarDadosCentrosDeCusto) filtra `vinculos` para conter apenas ids presentes
+    // em `centros` (que já veio filtrado por `ativo = true`) ANTES de chamar esta função pura. Então,
+    // quando o único centro vinculado a uma categoria foi desativado, essa categoria chega aqui sem
+    // NENHUM vínculo — exatamente como uma categoria que nunca teve vínculo algum — e cai no mesmo
+    // caminho existente de "Sem centro de custo", em vez de ser silenciosamente descartada.
+    const resultado = agruparMovimentacoesPorCentroDeCusto(
+      [mov({ valor: 90, categorias_movimentacao: { id: 'cat-doacao', nome: 'Doação' } })],
+      [{ id: 'centro-1', nome: 'Administrativo', cor: '#000000' }],
+      []
+    )
+
+    const semCentro = resultado.find((c) => c.id === SEM_CENTRO_ID)
+    expect(semCentro).toBeDefined()
+    expect(semCentro!.totalEntradas).toBe(90)
+    expect(resultado.find((c) => c.id === 'centro-1')!.totalEntradas).toBe(0)
+  })
 })

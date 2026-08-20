@@ -172,10 +172,13 @@ export async function buscarDadosCentrosDeCusto(
   if (movimentacoesRes.error) throw movimentacoesRes.error
 
   const centros: CentroDeCustoInput[] = (centrosRes.data ?? []).map((c) => ({ id: c.id, nome: c.nome, cor: c.cor }))
-  const vinculos: VinculoCentroCategoria[] = (vinculosRes.data ?? []).map((v) => ({
-    centroDeCustoId: v.centro_de_custo_id,
-    categoriaId: v.categoria_id,
-  }))
+  const idsAtivos = new Set(centros.map((c) => c.id))
+  const vinculos: VinculoCentroCategoria[] = (vinculosRes.data ?? [])
+    .filter((v) => idsAtivos.has(v.centro_de_custo_id))
+    .map((v) => ({
+      centroDeCustoId: v.centro_de_custo_id,
+      categoriaId: v.categoria_id,
+    }))
 
   return agruparMovimentacoesPorCentroDeCusto(
     (movimentacoesRes.data ?? []) as unknown as MovimentacaoBrutaCentro[],
