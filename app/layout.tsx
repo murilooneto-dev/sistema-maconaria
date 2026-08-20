@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   description: "Sistema de gestão administrativa e financeira da Loja Maçônica",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="pt-BR"
