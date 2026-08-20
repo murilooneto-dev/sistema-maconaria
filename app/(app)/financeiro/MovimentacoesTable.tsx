@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import Link from 'next/link'
 import { cancelarMovimentacao } from './actions'
 import { AnexosExpandable } from '@/components/anexos/AnexosExpandable'
 import type { AnexoItem } from '@/components/anexos/AnexosList'
 import { formatarDataBR, formatarMoedaBR } from '@/lib/format'
+import { podeEditarMovimentacao } from '@/lib/domain/financeiro'
 
 type Movimentacao = {
   id: string
@@ -103,6 +105,13 @@ export function MovimentacoesTable({
               </td>
               {podeEditar && (
                 <td className="px-4 py-2">
+                  {podeEditarMovimentacao(mov).valido && (
+                    <>
+                      <Link href={`/financeiro/${mov.id}/editar`} className="mr-3 text-slate-700 underline">
+                        Editar
+                      </Link>
+                    </>
+                  )}
                   {mov.status === 'ATIVO' && mov.origem !== 'MENSALIDADE' && (
                     <button
                       type="button"
