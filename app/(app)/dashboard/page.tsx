@@ -140,7 +140,7 @@ export default async function DashboardPage({
         <div className="rounded-lg border border-slate-200 bg-white p-4">
           <div className="mb-2 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-slate-900">Últimas movimentações</h2>
-            <Link href="/financeiro" className="text-xs text-slate-500 underline">
+            <Link href="/financeiro/movimentacoes" className="text-xs text-slate-500 underline">
               Ver todas
             </Link>
           </div>

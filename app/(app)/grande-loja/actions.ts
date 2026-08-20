@@ -126,6 +126,7 @@ export async function marcarComoEnviado(_prevState: ActionState, formData: FormD
 
   revalidatePath('/grande-loja')
   revalidatePath('/financeiro')
+  revalidatePath('/financeiro/movimentacoes')
   return { success: 'Repasse registrado com sucesso.' }
 }
 
@@ -300,5 +301,6 @@ export async function cancelarRepasse(repasseId: string): Promise<{ error?: stri
 
   revalidatePath('/grande-loja')
   revalidatePath('/financeiro')
+  revalidatePath('/financeiro/movimentacoes')
   return {}
 }

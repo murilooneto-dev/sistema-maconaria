@@ -13,7 +13,7 @@ O sistema tem três perfis (`profiles.role`, ver `docs/banco.md`): `ADMINISTRADO
 | Área | ADMINISTRADOR | TESOUREIRO | CONSULTA |
 |------|----------------|------------|----------|
 | Membros (cadastro) | Ler e escrever | Somente leitura | Somente leitura |
-| Configurações — Loja (nome/logo), Recibo (assinatura), Mensalidades/Remidos (`config_mensalidade`), Contas, Formas de pagamento | Ler e escrever | Somente leitura | Somente leitura |
+| Configurações — Loja (nome/logo), Recibo (assinatura), Mensalidades/Remidos (`config_mensalidade`), Contas, Formas de pagamento, Centros de custo (`/configuracoes/centros-de-custo`) | Ler e escrever | Somente leitura | Somente leitura |
 | Mensalidades / Pagamentos | Ler e escrever | Ler e escrever | Somente leitura |
 | Campanhas / Doações | Ler e escrever | Ler e escrever | Somente leitura |
 | Movimentações / Transferências | Ler e escrever | Ler e escrever | Somente leitura |

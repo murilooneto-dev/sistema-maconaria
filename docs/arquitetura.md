@@ -62,9 +62,11 @@ Este documento descreve a estrutura de pastas, o fluxo de autenticação e os m�
 │       │   └── [id]/                   # Detalhe: doações, nova doação (vincula financeiro), cancelar doação, editar, mudar status
 │       │       └── actions.ts          # Server Actions: registrarDoacao(), cancelarDoacao()
 │       ├── financeiro/                # Módulo Financeiro — Fase 7
-│       │   ├── FinanceiroTabs.tsx      # Navegação entre as 4 sub-telas (Client Component)
-│       │   ├── page.tsx                # Movimentações: filtros + tabela + totais (Server Component)
+│       │   ├── FinanceiroTabs.tsx      # Navegação entre as 5 sub-telas (Client Component)
+│       │   ├── page.tsx                # Visão geral: dashboard de entradas/saídas por centro de custo (Server Component)
+│       │   ├── CentrosDeCustoGrid.tsx  # Cards de resumo por centro de custo (Client Component)
 │       │   ├── actions.ts              # Server Actions: registrarMovimentacao(), cancelarMovimentacao()
+│       │   ├── movimentacoes/          # Movimentações: filtros + tabela + totais (Server Component)
 │       │   ├── MovimentacoesTable.tsx  # Tabela com cancelamento (Client Component)
 │       │   ├── nova/                   # Lançamento manual (Tronco/Recebimentos/Despesas/Custos/Avulsos)
 │       │   ├── transferencias/         # Server Actions registrarTransferencia()/cancelarTransferencia() + tela
@@ -118,11 +120,16 @@ Este documento descreve a estrutura de pastas, o fluxo de autenticação e os m�
 │           │   ├── page.tsx           # Edição da assinatura usada nos recibos (Server Component, admin-only)
 │           │   ├── AssinaturaForm.tsx # Formulário (Client Component, useActionState) com upload de assinatura
 │           │   └── actions.ts         # Server Action atualizarAssinatura() — upload em loja-assets/assinaturas via service_role
-│           └── categorias/            # Categorias de movimentação (Entrada/Saída) — Fase 7, admin-only
-│               ├── page.tsx           # Lista (categoria "Mensalidade" é de sistema, não editável)
-│               ├── CategoriasTable.tsx
-│               ├── NovaCategoriaForm.tsx
-│               └── actions.ts         # Server Actions: criarCategoria, atualizarCategoria
+│           ├── categorias/            # Categorias de movimentação (Entrada/Saída) — Fase 7, admin-only
+│           │   ├── page.tsx           # Lista (categoria "Mensalidade" é de sistema, não editável)
+│           │   ├── CategoriasTable.tsx
+│           │   ├── NovaCategoriaForm.tsx
+│           │   └── actions.ts         # Server Actions: criarCategoria, atualizarCategoria
+│           └── centros-de-custo/      # Centros de custo (agrupamento de categorias) — admin-only
+│               ├── page.tsx           # Lista de centros de custo (Server Component)
+│               ├── CentrosDeCustoList.tsx # Tabela com toggle ativo/inativo e vínculo de categorias (Client Component)
+│               ├── NovoCentroForm.tsx # Formulário de criação (Client Component, useActionState)
+│               └── actions.ts         # Server Actions: criarCentroDeCusto, atualizarCentroDeCusto, atualizarCategoriasDoCentro
 ├── components/
 │   ├── AcessoNegado.tsx          # Mensagem padrão de "sem permissão" para páginas restritas por role
 │   ├── configuracoes/

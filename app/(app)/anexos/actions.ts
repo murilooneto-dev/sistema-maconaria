@@ -92,6 +92,7 @@ export async function excluirAnexo(anexoId: string): Promise<{ error?: string }>
     revalidatePath('/mensalidades/pagamento')
   } else {
     revalidatePath('/financeiro')
+    revalidatePath('/financeiro/movimentacoes')
   }
 
   return {}

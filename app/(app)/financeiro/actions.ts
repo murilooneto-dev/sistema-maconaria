@@ -97,6 +97,7 @@ export async function registrarMovimentacao(
   })
 
   revalidatePath('/financeiro')
+  revalidatePath('/financeiro/movimentacoes')
 
   if (errosAnexos.length > 0) {
     return { success: `Movimentação registrada com sucesso. Falha ao anexar arquivo(s): ${errosAnexos.join(' ')}` }
@@ -174,6 +175,7 @@ export async function cancelarMovimentacao(id: string, motivo: string): Promise<
   }
 
   revalidatePath('/financeiro')
+  revalidatePath('/financeiro/movimentacoes')
   return {}
 }
 

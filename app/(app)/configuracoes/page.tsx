@@ -8,6 +8,7 @@ const SECOES = [
   { titulo: 'Contas', href: '/configuracoes/contas', apenasAdmin: true },
   { titulo: 'Formas de pagamento', href: '/configuracoes/formas-pagamento', apenasAdmin: true },
   { titulo: 'Categorias de movimentação', href: '/configuracoes/categorias', apenasAdmin: true },
+  { titulo: 'Centros de custo', href: '/configuracoes/centros-de-custo', apenasAdmin: true },
   { titulo: 'Recibo', href: '/configuracoes/recibo', apenasAdmin: true },
 ] as const
 

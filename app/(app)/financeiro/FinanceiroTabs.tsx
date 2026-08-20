@@ -4,7 +4,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 const TABS = [
-  { href: '/financeiro', label: 'Movimentações' },
+  { href: '/financeiro', label: 'Visão geral' },
+  { href: '/financeiro/movimentacoes', label: 'Movimentações' },
   { href: '/financeiro/nova', label: 'Nova movimentação' },
   { href: '/financeiro/transferencias', label: 'Transferências' },
   { href: '/financeiro/fechamento', label: 'Fechamento mensal' },
