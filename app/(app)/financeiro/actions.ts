@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { requireTesoureiro, AuthorizationError } from '@/lib/auth/require-role'
 import { createSupabaseServiceRoleClient } from '@/lib/supabase/service'
 import { registrarAuditoria } from '@/lib/audit'
-import { validarMovimentacao } from '@/lib/domain/financeiro'
+import { validarMovimentacao, podeEditarMovimentacao } from '@/lib/domain/financeiro'
 import { periodoEstaFechado } from '@/lib/financeiro/periodo'
 import { uploadAnexosDoFormulario } from '@/lib/anexos/upload'
 
@@ -224,29 +224,9 @@ export async function editarMovimentacao(
     return { error: 'Movimentação não encontrada.' }
   }
 
-  if (antiga.status !== 'ATIVO') {
-    return { error: 'Esta movimentação já foi cancelada ou editada.' }
-  }
-
-  if (antiga.origem === 'MENSALIDADE') {
-    return {
-      error:
-        'Esta movimentação é gerada automaticamente por um pagamento de mensalidade — cancele o pagamento na tela de Mensalidades.',
-    }
-  }
-
-  if (antiga.origem === 'CAMPANHA') {
-    return {
-      error:
-        'Esta movimentação é gerada automaticamente por uma doação de campanha — cancele a doação na tela de Campanhas.',
-    }
-  }
-
-  if (antiga.origem === 'GRANDE_LOJA') {
-    return {
-      error:
-        'Esta movimentação é gerada automaticamente por um repasse à Grande Loja — cancele o repasse na tela de Grande Loja.',
-    }
+  const editavel = podeEditarMovimentacao({ status: antiga.status, origem: antiga.origem })
+  if (!editavel.valido) {
+    return { error: editavel.erro }
   }
 
   if (await periodoEstaFechado(supabaseAdmin, antiga.data)) {
@@ -330,6 +310,35 @@ export async function editarMovimentacao(
     return { error: 'Esta movimentação foi alterada por outra operação simultânea. Tente novamente.' }
   }
 
+  const dadosAnterioresAuditoria = {
+    id: antiga.id,
+    data: antiga.data,
+    tipo: antiga.tipo,
+    categoriaId: antiga.categoria_id,
+    descricao: antiga.descricao,
+    valor: Number(antiga.valor),
+    contaId: antiga.conta_id,
+    formaPagamentoId: antiga.forma_pagamento_id,
+    membroId: antiga.membro_id,
+    observacao: antiga.observacao,
+    origem: antiga.origem,
+  }
+  const dadosNovosAuditoria = {
+    movimentacaoAntigaId: antiga.id,
+    movimentacaoNovaId: nova.id,
+    data,
+    tipo,
+    categoriaId,
+    descricao,
+    valor,
+    contaId,
+    formaPagamentoId,
+    membroId,
+    observacao,
+    motivoEdicao,
+  }
+  const descricaoAuditoria = `Edição da movimentação ${antiga.id} (substituída por ${nova.id})`
+
   try {
     await registrarAuditoria({
       usuarioId: usuario.id,
@@ -337,37 +346,32 @@ export async function editarMovimentacao(
       acao: 'EDICAO_MOVIMENTACAO',
       registroTabela: 'movimentacoes',
       registroId: nova.id,
-      dadosAnteriores: {
-        id: antiga.id,
-        data: antiga.data,
-        tipo: antiga.tipo,
-        categoriaId: antiga.categoria_id,
-        descricao: antiga.descricao,
-        valor: antiga.valor,
-        contaId: antiga.conta_id,
-        formaPagamentoId: antiga.forma_pagamento_id,
-        membroId: antiga.membro_id,
-        observacao: antiga.observacao,
-        origem: antiga.origem,
-      },
-      dadosNovos: {
-        movimentacaoAntigaId: antiga.id,
-        movimentacaoNovaId: nova.id,
-        data,
-        tipo,
-        categoriaId,
-        descricao,
-        valor,
-        contaId,
-        formaPagamentoId,
-        membroId,
-        observacao,
-        motivoEdicao,
-      },
-      descricao: `Edição da movimentação ${antiga.id} (substituída por ${nova.id})`,
+      dadosAnteriores: dadosAnterioresAuditoria,
+      dadosNovos: dadosNovosAuditoria,
+      descricao: descricaoAuditoria,
     })
   } catch (auditError) {
-    console.error('Falha ao registrar auditoria (movimentação editada com sucesso):', auditError)
+    console.error('Falha ao registrar auditoria (movimentação editada com sucesso) — registroId nova.id:', auditError)
+  }
+
+  // Segunda entrada de auditoria com registroId = id da movimentação antiga, para
+  // que uma busca por "o que aconteceu com a movimentação X" usando o id antigo
+  // (o que foi cancelado) encontre o registro — o índice de auditoria é por
+  // (registro_tabela, registro_id), e o id antigo só existe dentro do jsonb
+  // dados_anteriores da entrada acima.
+  try {
+    await registrarAuditoria({
+      usuarioId: usuario.id,
+      modulo: 'financeiro',
+      acao: 'EDICAO_MOVIMENTACAO',
+      registroTabela: 'movimentacoes',
+      registroId: antiga.id,
+      dadosAnteriores: dadosAnterioresAuditoria,
+      dadosNovos: dadosNovosAuditoria,
+      descricao: descricaoAuditoria,
+    })
+  } catch (auditError) {
+    console.error('Falha ao registrar auditoria (movimentação editada com sucesso) — registroId antiga.id:', auditError)
   }
 
   const { erros: errosAnexos } = await uploadAnexosDoFormulario(supabaseAdmin, formData, 'anexos', {

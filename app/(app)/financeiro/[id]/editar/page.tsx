@@ -1,5 +1,6 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { AcessoNegado } from '@/components/AcessoNegado'
+import { podeEditarMovimentacao } from '@/lib/domain/financeiro'
 import { FinanceiroTabs } from '../../FinanceiroTabs'
 import { NovaMovimentacaoForm } from '../../nova/NovaMovimentacaoForm'
 
@@ -49,7 +50,7 @@ export default async function EditarMovimentacaoPage({
       <h1 className="text-lg font-semibold text-slate-900">Financeiro</h1>
       <FinanceiroTabs />
 
-      {!movimentacao || movimentacao.status !== 'ATIVO' || movimentacao.origem !== 'MANUAL' ? (
+      {!movimentacao || !podeEditarMovimentacao(movimentacao).valido ? (
         <p className="text-sm text-red-600">
           Esta movimentação não pode ser editada (não encontrada, já cancelada, ou gerada automaticamente por um
           pagamento de mensalidade, doação de campanha ou repasse à Grande Loja).

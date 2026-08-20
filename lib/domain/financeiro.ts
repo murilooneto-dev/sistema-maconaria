@@ -117,3 +117,29 @@ export function podeReabrir(alvo: PeriodoFechado, maisRecenteFechado: PeriodoFec
   }
   return { valido: true }
 }
+
+export type MovimentacaoEditavel = { status: string; origem: string }
+
+const MENSAGENS_ORIGEM_NAO_EDITAVEL: Record<string, string> = {
+  MENSALIDADE:
+    'Esta movimentação é gerada automaticamente por um pagamento de mensalidade — cancele o pagamento na tela de Mensalidades.',
+  CAMPANHA:
+    'Esta movimentação é gerada automaticamente por uma doação de campanha — cancele a doação na tela de Campanhas.',
+  GRANDE_LOJA:
+    'Esta movimentação é gerada automaticamente por um repasse à Grande Loja — cancele o repasse na tela de Grande Loja.',
+}
+
+/** Só movimentações ATIVAS de origem MANUAL podem ser editadas — as automáticas têm vínculo com outro registro (pagamento/doação/repasse) que a edição (cancelar+recriar) perderia. */
+export function podeEditarMovimentacao(mov: MovimentacaoEditavel): ValidationResult {
+  if (mov.status !== 'ATIVO') {
+    return { valido: false, erro: 'Esta movimentação já foi cancelada ou editada.' }
+  }
+  const mensagemOrigem = MENSAGENS_ORIGEM_NAO_EDITAVEL[mov.origem]
+  if (mensagemOrigem) {
+    return { valido: false, erro: mensagemOrigem }
+  }
+  if (mov.origem !== 'MANUAL') {
+    return { valido: false, erro: 'Esta movimentação não pode ser editada.' }
+  }
+  return { valido: true }
+}
