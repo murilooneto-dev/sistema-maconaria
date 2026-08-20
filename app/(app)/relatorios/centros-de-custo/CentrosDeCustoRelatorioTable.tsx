@@ -46,7 +46,7 @@ export function CentrosDeCustoRelatorioTable({ centros }: { centros: CentroDeCus
                 </thead>
                 <tbody>
                   {centro.categorias.map((categoria) => {
-                    const chave = `${centro.id}:${categoria.nome}`
+                    const chave = `${centro.id}:${categoria.nome}:${categoria.tipo}`
                     const categoriaAbertaAqui = categoriaAberta === chave
                     return (
                       <Fragment key={chave}>
