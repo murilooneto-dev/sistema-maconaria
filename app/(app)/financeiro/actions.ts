@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 import { requireTesoureiro, AuthorizationError } from '@/lib/auth/require-role'
 import { createSupabaseServiceRoleClient } from '@/lib/supabase/service'
 import { registrarAuditoria } from '@/lib/audit'
@@ -383,9 +384,14 @@ export async function editarMovimentacao(
   })
 
   revalidatePath('/financeiro')
+  revalidatePath('/financeiro/movimentacoes')
 
   if (errosAnexos.length > 0) {
-    return { success: `Movimentação editada com sucesso. Falha ao anexar arquivo(s): ${errosAnexos.join(' ')}` }
+    console.error(`Falha ao anexar arquivo(s) na edição da movimentação ${nova.id}: ${errosAnexos.join(' ')}`)
   }
-  return { success: 'Movimentação editada com sucesso.' }
+
+  // A movimentação antiga (cuja URL de edição o usuário está vendo) foi cancelada
+  // como parte da edição — permanecer na mesma página faria podeEditarMovimentacao
+  // barrar o acesso e mostrar um erro de "não pode ser editada" logo após o sucesso.
+  redirect('/financeiro')
 }
