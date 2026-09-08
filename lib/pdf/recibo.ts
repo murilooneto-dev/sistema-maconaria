@@ -5,7 +5,7 @@ export type ImagemEmbutida = { bytes: Uint8Array; formato: 'png' | 'jpg' }
 
 export type DadosRecibo = {
   id: string
-  tipo: 'MENSALIDADE' | 'CAMPANHA'
+  tipo: 'MENSALIDADE' | 'CAMPANHA' | 'MOVIMENTACAO'
   pessoa: string
   valor: number
   referencia: string
@@ -47,7 +47,7 @@ function desenharImagemProporcional(
   return { largura, altura }
 }
 
-/** Gera o PDF de um recibo (Mensalidade ou Campanha) — SPEC §27, layout retrato compactado na metade superior da folha A4 (permite imprimir 2 recibos por folha). */
+/** Gera o PDF de um recibo (Mensalidade, Campanha ou Movimentação) — SPEC §27, layout retrato compactado na metade superior da folha A4 (permite imprimir 2 recibos por folha). */
 export async function gerarPdfRecibo(dados: DadosRecibo): Promise<Uint8Array> {
   const pdf = await PDFDocument.create()
   const page = pdf.addPage([595.28, 841.89]) // A4 retrato
@@ -121,7 +121,8 @@ export async function gerarPdfRecibo(dados: DadosRecibo): Promise<Uint8Array> {
   // --- Tabela de dados ---
   y -= 26
   const valorFormatado = formatarMoedaBR(dados.valor)
-  const tipoLabel = dados.tipo === 'MENSALIDADE' ? 'Mensalidade' : 'Doação (Campanha)'
+  const tipoLabel =
+    dados.tipo === 'MENSALIDADE' ? 'Mensalidade' : dados.tipo === 'CAMPANHA' ? 'Doação (Campanha)' : 'Recebimento'
 
   const linhas: [string, string][] = [
     ['Recebido de', dados.pessoa],
@@ -141,7 +142,9 @@ export async function gerarPdfRecibo(dados: DadosRecibo): Promise<Uint8Array> {
   const declaracao =
     dados.tipo === 'MENSALIDADE'
       ? 'Para clareza e como comprovante de quitação, firmamos o presente recibo.'
-      : 'Para clareza e como comprovante de recebimento da doação, firmamos o presente recibo.'
+      : dados.tipo === 'CAMPANHA'
+        ? 'Para clareza e como comprovante de recebimento da doação, firmamos o presente recibo.'
+        : 'Para clareza e como comprovante de recebimento do valor acima, firmamos o presente recibo.'
   for (const linha of quebrarLinhas(declaracao, fontRegular, 10, larguraUtil)) {
     page.drawText(linha, { x: margem, y, size: 10, font: fontRegular, color: COR_TEXTO })
     y -= 14
