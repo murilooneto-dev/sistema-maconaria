@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { AcessoNegado } from '@/components/AcessoNegado'
 import { FinanceiroTabs } from '../FinanceiroTabs'
 import { MovimentacoesTable } from '../MovimentacoesTable'
+import { GerarReciboModal } from '../GerarReciboModal'
 import { formatarMoedaBR } from '@/lib/format'
 
 type SearchParams = {
@@ -156,10 +157,11 @@ export default async function MovimentacoesPage({
             ))}
           </select>
         </div>
-        <div className="flex items-end">
+        <div className="flex items-end gap-2">
           <button type="submit" className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white">
             Filtrar
           </button>
+          {podeEditar && <GerarReciboModal movimentacoes={movimentacoes ?? []} />}
         </div>
       </form>
 
