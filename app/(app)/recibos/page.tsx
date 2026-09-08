@@ -6,6 +6,7 @@ import { formatarDataBR, formatarMoedaBR } from '@/lib/format'
 const TIPO_LABEL: Record<string, string> = {
   MENSALIDADE: 'Mensalidade',
   CAMPANHA: 'Campanha',
+  MOVIMENTACAO: 'Movimentação',
 }
 
 export default async function RecibosPage({
@@ -64,6 +65,7 @@ export default async function RecibosPage({
             <option value="">Todos</option>
             <option value="MENSALIDADE">Mensalidade</option>
             <option value="CAMPANHA">Campanha</option>
+            <option value="MOVIMENTACAO">Movimentação</option>
           </select>
         </div>
         <div className="space-y-1">

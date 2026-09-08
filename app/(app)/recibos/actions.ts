@@ -23,9 +23,18 @@ export async function gerarRecibo(_prevState: ActionState, formData: FormData): 
   const tipo = String(formData.get('tipo') ?? '')
   const pagamentoId = String(formData.get('pagamentoId') ?? '') || null
   const doacaoId = String(formData.get('doacaoId') ?? '') || null
+  const movimentacaoId = String(formData.get('movimentacaoId') ?? '') || null
+  const pessoaInformada = String(formData.get('pessoa') ?? '').trim() || null
+  const referenciaInformada = String(formData.get('referencia') ?? '').trim() || null
   const descricao = String(formData.get('descricao') ?? '').trim() || null
 
-  const validacao = validarGeracaoRecibo({ tipo, pagamentoId, doacaoId })
+  const validacao = validarGeracaoRecibo({
+    tipo,
+    pagamentoId,
+    doacaoId,
+    movimentacaoId,
+    pessoa: pessoaInformada,
+  })
   if (!validacao.valido) {
     return { error: validacao.erro }
   }
@@ -70,7 +79,7 @@ export async function gerarRecibo(_prevState: ActionState, formData: FormData): 
     valor = Number(pagamento.valor_total)
     referencia = competencias.length > 0 ? `mensalidade(s) ${competencias.join(', ')}` : 'mensalidade'
     data = pagamento.data_pagamento
-  } else {
+  } else if (tipo === 'CAMPANHA') {
     const { data: doacao, error: doacaoError } = await supabaseAdmin
       .from('doacoes')
       .select('id, doador, membro_id, valor, data, status, campanhas(titulo)')
@@ -90,6 +99,32 @@ export async function gerarRecibo(_prevState: ActionState, formData: FormData): 
     valor = Number(doacao.valor)
     referencia = campanha?.titulo ?? 'campanha'
     data = doacao.data
+  } else {
+    const { data: movimentacao, error: movimentacaoError } = await supabaseAdmin
+      .from('movimentacoes')
+      .select('id, membro_id, valor, data, tipo, status, categorias_movimentacao(nome)')
+      .eq('id', movimentacaoId)
+      .single()
+
+    if (movimentacaoError || !movimentacao) {
+      return { error: 'Movimentação não encontrada.' }
+    }
+    if (movimentacao.tipo !== 'ENTRADA') {
+      return { error: 'Só é possível gerar recibo para uma entrada de dinheiro.' }
+    }
+    if (movimentacao.status !== 'ATIVO') {
+      return { error: 'Esta movimentação está cancelada — não é possível gerar recibo.' }
+    }
+
+    const categoria = Array.isArray(movimentacao.categorias_movimentacao)
+      ? movimentacao.categorias_movimentacao[0]
+      : movimentacao.categorias_movimentacao
+
+    pessoa = pessoaInformada as string
+    membroId = movimentacao.membro_id
+    valor = Number(movimentacao.valor)
+    referencia = referenciaInformada ?? categoria?.nome ?? 'movimentação financeira'
+    data = movimentacao.data
   }
 
   const { data: lojaConfig } = await supabaseAdmin
@@ -113,6 +148,7 @@ export async function gerarRecibo(_prevState: ActionState, formData: FormData): 
       usuario_id: usuario.id,
       pagamento_id: tipo === 'MENSALIDADE' ? pagamentoId : null,
       doacao_id: tipo === 'CAMPANHA' ? doacaoId : null,
+      movimentacao_id: tipo === 'MOVIMENTACAO' ? movimentacaoId : null,
     })
     .select('id')
     .single()
@@ -129,7 +165,9 @@ export async function gerarRecibo(_prevState: ActionState, formData: FormData): 
       registroTabela: 'recibos',
       registroId: recibo.id,
       dadosNovos: { tipo, pessoa, valor, referencia, data },
-      descricao: `Recibo de ${tipo === 'MENSALIDADE' ? 'mensalidade' : 'campanha'} para ${pessoa}`,
+      descricao: `Recibo de ${
+        tipo === 'MENSALIDADE' ? 'mensalidade' : tipo === 'CAMPANHA' ? 'campanha' : 'movimentação'
+      } para ${pessoa}`,
     })
   } catch (auditError) {
     console.error('Falha ao registrar auditoria (recibo gerado com sucesso):', auditError)
