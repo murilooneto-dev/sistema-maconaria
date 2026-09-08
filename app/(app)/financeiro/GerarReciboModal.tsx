@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { gerarRecibo } from '../recibos/actions'
 import { formatarDataBR, formatarMoedaBR } from '@/lib/format'
 
@@ -39,7 +40,8 @@ export function GerarReciboModal({ movimentacoes }: { movimentacoes: Movimentaca
         Gerar recibo
       </button>
 
-      {aberto && <ModalConteudo elegiveis={elegiveis} onClose={() => setAberto(false)} />}
+      {aberto &&
+        createPortal(<ModalConteudo elegiveis={elegiveis} onClose={() => setAberto(false)} />, document.body)}
     </>
   )
 }
