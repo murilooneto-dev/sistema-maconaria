@@ -35,7 +35,7 @@ export function GerarReciboModal({ movimentacoes }: { movimentacoes: Movimentaca
       <button
         type="button"
         onClick={() => setAberto(true)}
-        className="rounded border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white"
       >
         Gerar recibo
       </button>
