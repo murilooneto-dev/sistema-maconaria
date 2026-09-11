@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { cancelarPagamento } from './actions'
+import { gerarRecibo } from '../../recibos/actions'
 import { AnexosExpandable } from '@/components/anexos/AnexosExpandable'
 import type { AnexoItem } from '@/components/anexos/AnexosList'
 import { formatarDataBR, formatarMoedaBR } from '@/lib/format'
@@ -25,6 +26,7 @@ export function HistoricoPagamentos({
 }) {
   const [isPending, startTransition] = useTransition()
   const [feedback, setFeedback] = useState<{ id: string; message: string; isError: boolean } | null>(null)
+  const [recibosGerados, setRecibosGerados] = useState<Record<string, string>>({})
 
   function handleCancelar(pagamento: Pagamento) {
     const motivo = window.prompt(`Motivo do cancelamento do pagamento de ${formatarDataBR(pagamento.data_pagamento)}:`)
@@ -39,6 +41,22 @@ export function HistoricoPagamentos({
         message: result.error ?? 'Pagamento cancelado.',
         isError: Boolean(result.error),
       })
+    })
+  }
+
+  function handleGerarRecibo(pagamento: Pagamento) {
+    startTransition(async () => {
+      const formData = new FormData()
+      formData.set('tipo', 'MENSALIDADE')
+      formData.set('pagamentoId', pagamento.id)
+
+      const result = await gerarRecibo(undefined, formData)
+      if (result && 'success' in result) {
+        setRecibosGerados((atual) => ({ ...atual, [pagamento.id]: result.reciboId }))
+        setFeedback({ id: pagamento.id, message: result.success, isError: false })
+      } else {
+        setFeedback({ id: pagamento.id, message: result?.error ?? 'Falha ao gerar recibo.', isError: true })
+      }
     })
   }
 
@@ -75,14 +93,35 @@ export function HistoricoPagamentos({
               </td>
               <td className="px-4 py-2">
                 {pagamento.status === 'ATIVO' && (
-                  <button
-                    type="button"
-                    disabled={isPending}
-                    onClick={() => handleCancelar(pagamento)}
-                    className="text-slate-700 underline disabled:opacity-50"
-                  >
-                    Cancelar
-                  </button>
+                  <div className="flex items-center gap-3">
+                    {recibosGerados[pagamento.id] ? (
+                      <a
+                        href={`/recibos/${recibosGerados[pagamento.id]}/pdf`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-slate-700 underline"
+                      >
+                        Ver recibo
+                      </a>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => handleGerarRecibo(pagamento)}
+                        className="text-slate-700 underline disabled:opacity-50"
+                      >
+                        Gerar recibo
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => handleCancelar(pagamento)}
+                      className="text-slate-700 underline disabled:opacity-50"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
                 )}
               </td>
             </tr>
