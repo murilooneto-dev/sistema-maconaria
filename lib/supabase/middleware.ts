@@ -32,8 +32,12 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const isLoginRoute = request.nextUrl.pathname.startsWith('/login')
+  // Recuperação de senha: pedir o link e voltar por ele acontece sem sessão.
+  // `/nova-senha` NÃO é pública — só abre com a sessão criada pelo link.
+  const isRecuperacaoRoute =
+    request.nextUrl.pathname.startsWith('/recuperar-senha') || request.nextUrl.pathname.startsWith('/auth/confirm')
 
-  if (!user && !isLoginRoute) {
+  if (!user && !isLoginRoute && !isRecuperacaoRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     const redirectResponse = NextResponse.redirect(url)

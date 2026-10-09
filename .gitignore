@@ -1,4 +1,12 @@
 .superpowers/
+.claude/worktrees/
+supabase/.temp/
+
+# imagens de assinatura reais usadas em testes locais — nunca versionar
+/assinatura*.png
+/assinatura*.jpeg
+/assbruno.png
+/BRUNOASS.jpeg
 
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 

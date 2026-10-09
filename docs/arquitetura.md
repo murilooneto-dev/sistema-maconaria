@@ -155,7 +155,7 @@ Este documento descreve a estrutura de pastas, o fluxo de autenticação e os m�
 │   │   ├── membros.test.ts       # Testes unitários de validação de membros — Fase 5
 │   │   ├── inadimplencia.ts      # calcularSituacaoMembro(), contarCompetenciasVencidasNaoPagas() — centraliza regra de 6+ competências vencidas — Fases 5–6
 │   │   ├── inadimplencia.test.ts # Testes unitários de cálculo de inadimplência — Fases 5–6
-│   │   ├── competencias.ts       # proximaCompetenciaAposCadastro(), competenciasFaltantes(), dataVencimento() — SPEC §10 — Fase 6
+│   │   ├── competencias.ts       # competenciaDoCadastro(), primeiraCompetenciaDoAno(), competenciasFaltantes() — SPEC §10 (mensalidade só do mês do cadastro em diante) — Fase 6
 │   │   ├── competencias.test.ts  # Testes unitários de cálculo de competências — Fase 6
 │   │   ├── pagamentos.ts         # validarAlocacoes(), calcularNovoStatusMensalidade() — SPEC §11–13 — Fase 6
 │   │   ├── pagamentos.test.ts    # Testes unitários de validação de pagamentos — Fase 6
@@ -216,7 +216,7 @@ Este documento descreve a estrutura de pastas, o fluxo de autenticação e os m�
 │   ├── banco.md                  # Schema, RLS, constraints, decisões de design
 │   ├── permissoes.md             # Matriz de permissões por perfil e as duas camadas de enforcement (RLS + requireAdmin/requireTesoureiro)
 │   └── instalacao.md             # Passo a passo de setup local
-├── SPEC_Loja_Maconica.md         # Especificação funcional/técnica (fonte de verdade)
+├── SPEC.md         # Especificação funcional/técnica (fonte de verdade)
 ├── CLAUDE.md                     # Regras permanentes de desenvolvimento
 ├── PROMPT_INICIAL.md             # Roadmap/fases do projeto
 └── .env.example                  # Variáveis de ambiente necessárias

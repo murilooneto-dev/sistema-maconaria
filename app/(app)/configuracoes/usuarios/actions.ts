@@ -5,7 +5,7 @@ import { requireAdmin, AuthorizationError } from '@/lib/auth/require-role'
 import { createSupabaseServiceRoleClient } from '@/lib/supabase/service'
 import { registrarAuditoria } from '@/lib/audit'
 import { normalizeUsername, usernameToAuthEmail } from '@/lib/domain/auth'
-import { validarEdicaoUsuario, validarNovoUsuario, validarSenha } from '@/lib/domain/usuarios'
+import { normalizarEmail, validarEdicaoUsuario, validarNovoUsuario, validarSenha } from '@/lib/domain/usuarios'
 import type { Role } from '@/lib/domain/authorization'
 
 type CriarUsuarioState = { error: string } | { success: string } | undefined
@@ -30,6 +30,7 @@ export async function criarUsuario(
     nome: String(formData.get('nome') ?? ''),
     role: String(formData.get('role') ?? ''),
     senha: String(formData.get('senha') ?? ''),
+    email: String(formData.get('email') ?? ''),
   }
 
   const validacao = validarNovoUsuario(input)
@@ -38,7 +39,9 @@ export async function criarUsuario(
   }
 
   const username = normalizeUsername(input.username)
-  const email = usernameToAuthEmail(input.username)
+  const emailReal = normalizarEmail(input.email)
+  // A validação acima já exige e-mail; o interno fica só como rede de segurança.
+  const email = emailReal ?? usernameToAuthEmail(input.username)
   const role = input.role as Role
   const supabaseAdmin = createSupabaseServiceRoleClient()
 
@@ -58,6 +61,7 @@ export async function criarUsuario(
     nome: input.nome.trim(),
     role,
     ativo: true,
+    email: emailReal,
   })
 
   if (profileError) {
@@ -86,7 +90,7 @@ export async function criarUsuario(
       acao: 'CRIACAO',
       registroTabela: 'profiles',
       registroId: created.user.id,
-      dadosNovos: { username, nome: input.nome.trim(), role, ativo: true },
+      dadosNovos: { username, nome: input.nome.trim(), role, ativo: true, email: emailReal },
       descricao: `Criação do usuário ${username}`,
     })
   } catch (auditError) {
@@ -100,7 +104,8 @@ export async function criarUsuario(
 export async function atualizarUsuario(
   id: string,
   nome: string,
-  role: string
+  role: string,
+  email: string
 ): Promise<{ error?: string }> {
   let admin
   try {
@@ -109,7 +114,7 @@ export async function atualizarUsuario(
     return { error: mensagemAutorizacao(err) }
   }
 
-  const validacao = validarEdicaoUsuario({ nome, role })
+  const validacao = validarEdicaoUsuario({ nome, role, email })
   if (!validacao.valido) {
     return { error: validacao.erro }
   }
@@ -121,19 +126,65 @@ export async function atualizarUsuario(
   const supabaseAdmin = createSupabaseServiceRoleClient()
   const { data: anterior } = await supabaseAdmin
     .from('profiles')
-    .select('nome, role')
+    .select('username, nome, role, email')
     .eq('id', id)
     .single()
 
+  if (!anterior) {
+    return { error: 'Usuário não encontrado.' }
+  }
+
+  const emailReal = normalizarEmail(email)
+  const emailMudou = emailReal !== anterior.email
+
+  // O e-mail de autenticação (auth.users) precisa acompanhar o do perfil: é
+  // para ele que o Supabase envia o link de recuperação e é com ele que o
+  // login autentica. Troca primeiro no Auth, que é onde a unicidade é
+  // garantida; se o perfil falhar depois, desfaz.
+  if (emailMudou) {
+    const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(id, {
+      email: emailReal ?? usernameToAuthEmail(anterior.username),
+      email_confirm: true,
+    })
+    if (authError) {
+      return {
+        error:
+          authError.status === 422
+            ? 'Este e-mail já está em uso por outro usuário.'
+            : `Falha ao atualizar e-mail: ${authError.message}`,
+      }
+    }
+  }
+
   const { data: atualizado, error } = await supabaseAdmin
     .from('profiles')
-    .update({ nome: nome.trim(), role })
+    .update({ nome: nome.trim(), role, ...(emailMudou ? { email: emailReal } : {}) })
     .eq('id', id)
     .select('id')
     .single()
 
   if (error || !atualizado) {
-    return { error: `Falha ao atualizar usuário: ${error?.message ?? 'usuário não encontrado.'}` }
+    if (emailMudou) {
+      const { error: reverterError } = await supabaseAdmin.auth.admin.updateUserById(id, {
+        email: anterior.email ?? usernameToAuthEmail(anterior.username),
+        email_confirm: true,
+      })
+      if (reverterError) {
+        console.error(
+          `Falha ao reverter o e-mail de autenticação do usuário ${id} — perfil e Auth ficaram com e-mails diferentes, requer correção manual:`,
+          reverterError.message
+        )
+        return {
+          error: `Falha ao atualizar usuário e também ao desfazer a troca de e-mail — o usuário pode não conseguir entrar. Contate o suporte técnico com o ID ${id}.`,
+        }
+      }
+    }
+    return {
+      error:
+        error?.code === '23505'
+          ? 'Este e-mail já está em uso por outro usuário.'
+          : `Falha ao atualizar usuário: ${error?.message ?? 'usuário não encontrado.'}`,
+    }
   }
 
   try {
@@ -143,8 +194,8 @@ export async function atualizarUsuario(
       acao: 'EDICAO',
       registroTabela: 'profiles',
       registroId: id,
-      dadosAnteriores: anterior ?? null,
-      dadosNovos: { nome: nome.trim(), role },
+      dadosAnteriores: anterior,
+      dadosNovos: { nome: nome.trim(), role, email: emailReal },
       descricao: `Edição do usuário ${id}`,
     })
   } catch (auditError) {

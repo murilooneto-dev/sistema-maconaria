@@ -1,6 +1,7 @@
 import type { createSupabaseServerClient } from '@/lib/supabase/server'
 import { calcularTotal } from '@/lib/domain/grande-loja'
 import { formatarMoedaBR } from '@/lib/format'
+import { buscarTodos } from '@/lib/supabase/buscar-todos'
 import type { ResultadoRelatorio } from './tipos'
 
 const STATUS_LABEL: Record<string, string> = {
@@ -15,21 +16,22 @@ export async function buscarRelatorioGrandeLoja(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   filtros: FiltrosGrandeLoja
 ): Promise<ResultadoRelatorio> {
-  let query = supabase
-    .from('repasses_grande_loja_itens')
-    .select('valor, status, mensalidades(ano, mes, membros(nome)), repasses_grande_loja(data_envio)')
-    .order('created_at', { ascending: false })
+  const { data: itens } = await buscarTodos((de, ate) => {
+    let query = supabase
+      .from('repasses_grande_loja_itens')
+      .select('valor, status, mensalidades(ano, mes, membros(nome)), repasses_grande_loja(data_envio)')
 
-  if (filtros.status) query = query.eq('status', filtros.status)
+    if (filtros.status) query = query.eq('status', filtros.status)
 
-  const { data: itens } = await query
+    return query.order('created_at', { ascending: false }).order('id').range(de, ate)
+  })
 
   function primeiro<T>(rel: T[] | T | null): T | null {
     if (!rel) return null
     return Array.isArray(rel) ? (rel[0] ?? null) : rel
   }
 
-  let linhasFiltradas = (itens ?? []).filter((item) => {
+  const linhasFiltradas =(itens ?? []).filter((item) => {
     if (!filtros.ano || !filtros.mes) return true
     const repasse = primeiro(item.repasses_grande_loja)
     if (!repasse?.data_envio) return false

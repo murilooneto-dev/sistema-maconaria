@@ -1,6 +1,7 @@
 import type { createSupabaseServerClient } from '@/lib/supabase/server'
 import { calcularArrecadado, calcularPercentual } from '@/lib/domain/campanhas'
 import { formatarDataBR, formatarMoedaBR } from '@/lib/format'
+import { buscarTodos } from '@/lib/supabase/buscar-todos'
 import type { ResultadoRelatorio } from './tipos'
 
 const STATUS_LABEL: Record<string, string> = {
@@ -59,11 +60,15 @@ async function buscarRelatorioCampanhaEspecifica(
     return { titulo: 'Campanha não encontrada', colunas: [], linhas: [] }
   }
 
-  const { data: doacoes } = await supabase
-    .from('doacoes')
-    .select('doador, valor, data, status, membros(nome)')
-    .eq('campanha_id', campanhaId)
-    .order('data', { ascending: false })
+  const { data: doacoes } = await buscarTodos((de, ate) =>
+    supabase
+      .from('doacoes')
+      .select('doador, valor, data, status, membros(nome)')
+      .eq('campanha_id', campanhaId)
+      .order('data', { ascending: false })
+      .order('id')
+      .range(de, ate)
+  )
 
   const ativas = (doacoes ?? []).filter((d) => d.status === 'ATIVO')
   const arrecadado = calcularArrecadado(ativas)

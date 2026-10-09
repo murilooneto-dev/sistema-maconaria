@@ -1,5 +1,6 @@
 import type { createSupabaseServerClient } from '@/lib/supabase/server'
 import { formatarDataBR, formatarMoedaBR } from '@/lib/format'
+import { buscarTodos } from '@/lib/supabase/buscar-todos'
 import type { ResultadoRelatorio } from './tipos'
 
 export type FiltrosBalancete = {
@@ -111,16 +112,17 @@ export async function buscarBalancete(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   filtros: FiltrosBalancete
 ): Promise<Balancete> {
-  let query = supabase
-    .from('movimentacoes')
-    .select('data, descricao, valor, categorias_movimentacao(id, nome, tipo), contas(nome), formas_pagamento(nome)')
-    .eq('status', 'ATIVO')
-    .order('data', { ascending: true })
+  const { data, error } = await buscarTodos((de, ate) => {
+    let query = supabase
+      .from('movimentacoes')
+      .select('data, descricao, valor, categorias_movimentacao(id, nome, tipo), contas(nome), formas_pagamento(nome)')
+      .eq('status', 'ATIVO')
 
-  if (filtros.dataInicio) query = query.gte('data', filtros.dataInicio)
-  if (filtros.dataFim) query = query.lte('data', filtros.dataFim)
+    if (filtros.dataInicio) query = query.gte('data', filtros.dataInicio)
+    if (filtros.dataFim) query = query.lte('data', filtros.dataFim)
 
-  const { data, error } = await query
+    return query.order('data', { ascending: true }).order('id').range(de, ate)
+  })
   if (error) throw error
 
   return agruparMovimentacoesEmBalancete((data ?? []) as unknown as MovimentacaoBrutaBalancete[])

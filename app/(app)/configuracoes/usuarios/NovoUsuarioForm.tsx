@@ -69,6 +69,23 @@ export function NovoUsuarioForm() {
             className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
           />
         </div>
+
+        <div className="space-y-1 sm:col-span-2">
+          <label htmlFor="email" className="text-sm font-medium text-slate-700">
+            E-mail
+          </label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            autoComplete="off"
+            required
+            className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+          />
+          <p className="text-xs text-slate-500">
+            É com este e-mail que o usuário entra no sistema e recebe o link de recuperação de senha.
+          </p>
+        </div>
       </div>
 
       {state && 'error' in state && (

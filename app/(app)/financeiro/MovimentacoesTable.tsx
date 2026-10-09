@@ -6,7 +6,13 @@ import { cancelarMovimentacao } from './actions'
 import { AnexosExpandable } from '@/components/anexos/AnexosExpandable'
 import type { AnexoItem } from '@/components/anexos/AnexosList'
 import { formatarDataBR, formatarMoedaBR } from '@/lib/format'
-import { podeEditarMovimentacao } from '@/lib/domain/financeiro'
+import { podeCancelarMovimentacaoDiretamente, podeEditarMovimentacao } from '@/lib/domain/financeiro'
+
+const ROTULO_CANCELAR_NA_ORIGEM: Record<string, string> = {
+  MENSALIDADE: 'via Mensalidades',
+  CAMPANHA: 'via Campanhas',
+  GRANDE_LOJA: 'via Grande Loja',
+}
 
 type Movimentacao = {
   id: string
@@ -112,7 +118,7 @@ export function MovimentacoesTable({
                       </Link>
                     </>
                   )}
-                  {mov.status === 'ATIVO' && mov.origem !== 'MENSALIDADE' && (
+                  {mov.status === 'ATIVO' && podeCancelarMovimentacaoDiretamente(mov.origem).valido && (
                     <button
                       type="button"
                       disabled={isPending}
@@ -122,8 +128,8 @@ export function MovimentacoesTable({
                       Cancelar
                     </button>
                   )}
-                  {mov.status === 'ATIVO' && mov.origem === 'MENSALIDADE' && (
-                    <span className="text-xs text-slate-400">via Mensalidades</span>
+                  {mov.status === 'ATIVO' && ROTULO_CANCELAR_NA_ORIGEM[mov.origem] && (
+                    <span className="text-xs text-slate-400">{ROTULO_CANCELAR_NA_ORIGEM[mov.origem]}</span>
                   )}
                 </td>
               )}

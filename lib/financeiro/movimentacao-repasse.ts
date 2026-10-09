@@ -43,6 +43,7 @@ export async function criarMovimentacaoRepasse(
 export async function cancelarMovimentacaoRepasse(
   supabaseAdmin: ReturnType<typeof createSupabaseServiceRoleClient>,
   repasseId: string,
+  motivo: string,
   usuarioId: string
 ): Promise<{ error?: string }> {
   const { data: movimentacao } = await supabaseAdmin
@@ -60,7 +61,7 @@ export async function cancelarMovimentacaoRepasse(
     .from('movimentacoes')
     .update({
       status: 'CANCELADO',
-      motivo_cancelamento: 'Repasse à Grande Loja cancelado.',
+      motivo_cancelamento: `Repasse à Grande Loja cancelado. Motivo: ${motivo}`,
       cancelado_por: usuarioId,
       cancelado_em: new Date().toISOString(),
     })

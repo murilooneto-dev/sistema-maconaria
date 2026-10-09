@@ -6,6 +6,7 @@ import { createSupabaseServiceRoleClient } from '@/lib/supabase/service'
 import { registrarAuditoria } from '@/lib/audit'
 import { calcularTotal, validarSelecaoRepasse, MOTIVO_JA_REPASSADO } from '@/lib/domain/grande-loja'
 import { criarMovimentacaoRepasse, cancelarMovimentacaoRepasse } from '@/lib/financeiro/movimentacao-repasse'
+import { periodoEstaFechado } from '@/lib/financeiro/periodo'
 import { formatarMoedaBR } from '@/lib/format'
 
 type ActionState = { error: string } | { success: string } | undefined
@@ -87,7 +88,15 @@ export async function marcarComoEnviado(_prevState: ActionState, formData: FormD
   })
 
   if (movimentacaoResult.error) {
-    await supabaseAdmin.from('repasses_grande_loja').update({ status: 'CANCELADO' }).eq('id', repasse.id)
+    await supabaseAdmin
+      .from('repasses_grande_loja')
+      .update({
+        status: 'CANCELADO',
+        motivo_cancelamento: 'Cancelado automaticamente: falha ao registrar a movimentação financeira.',
+        cancelado_por: usuario.id,
+        cancelado_em: new Date().toISOString(),
+      })
+      .eq('id', repasse.id)
     return {
       error: `Falha ao registrar movimentação financeira: ${movimentacaoResult.error}. O repasse foi cancelado automaticamente.`,
     }
@@ -249,7 +258,7 @@ export async function reverterItemJaRepassado(itemId: string): Promise<{ error?:
   return {}
 }
 
-export async function cancelarRepasse(repasseId: string): Promise<{ error?: string }> {
+export async function cancelarRepasse(repasseId: string, motivo: string): Promise<{ error?: string }> {
   let usuario
   try {
     usuario = await requireTesoureiro()
@@ -257,11 +266,38 @@ export async function cancelarRepasse(repasseId: string): Promise<{ error?: stri
     return { error: mensagemAutorizacao(err) }
   }
 
+  if (motivo.trim().length === 0) {
+    return { error: 'Informe o motivo do cancelamento.' }
+  }
+
   const supabaseAdmin = createSupabaseServiceRoleClient()
+
+  const { data: repasse } = await supabaseAdmin
+    .from('repasses_grande_loja')
+    .select('id, data_envio')
+    .eq('id', repasseId)
+    .maybeSingle()
+
+  if (!repasse) {
+    return { error: 'Repasse não encontrado.' }
+  }
+
+  // Precisa ser checado ANTES de cancelar o repasse: o banco bloqueia o
+  // cancelamento da movimentação vinculada em período fechado, e o repasse
+  // ficaria CANCELADO (itens de volta a PENDENTE) com a saída ainda ATIVA
+  // no caixa.
+  if (await periodoEstaFechado(supabaseAdmin, repasse.data_envio)) {
+    return { error: 'Não é possível cancelar: o período deste repasse já está fechado.' }
+  }
 
   const { data: reivindicado, error: reivindicarError } = await supabaseAdmin
     .from('repasses_grande_loja')
-    .update({ status: 'CANCELADO' })
+    .update({
+      status: 'CANCELADO',
+      motivo_cancelamento: motivo.trim(),
+      cancelado_por: usuario.id,
+      cancelado_em: new Date().toISOString(),
+    })
     .eq('id', repasseId)
     .eq('status', 'ENVIADO')
     .select('id')
@@ -281,7 +317,7 @@ export async function cancelarRepasse(repasseId: string): Promise<{ error?: stri
     console.error(`Falha ao reabrir itens do repasse ${repasseId} cancelado:`, itensError.message)
   }
 
-  const movimentacaoResult = await cancelarMovimentacaoRepasse(supabaseAdmin, repasseId, usuario.id)
+  const movimentacaoResult = await cancelarMovimentacaoRepasse(supabaseAdmin, repasseId, motivo.trim(), usuario.id)
   if (movimentacaoResult.error) {
     console.error(`Falha ao cancelar a movimentação vinculada ao repasse ${repasseId}:`, movimentacaoResult.error)
   }
@@ -293,6 +329,7 @@ export async function cancelarRepasse(repasseId: string): Promise<{ error?: stri
       acao: 'CANCELAMENTO_REPASSE',
       registroTabela: 'repasses_grande_loja',
       registroId: repasseId,
+      dadosNovos: { motivo: motivo.trim() },
       descricao: `Cancelamento do repasse ${repasseId} — itens voltam a ficar PENDENTES`,
     })
   } catch (auditError) {

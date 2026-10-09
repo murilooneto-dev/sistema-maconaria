@@ -60,9 +60,14 @@ export function HistoricoRepasses({
   const [expandido, setExpandido] = useState<string | null>(null)
 
   function handleCancelar(id: string) {
-    if (!window.confirm('Cancelar este repasse? Os itens voltam a ficar pendentes.')) return
+    const motivo = window.prompt('Motivo do cancelamento do repasse (os itens voltam a ficar pendentes):')
+    if (motivo === null) return
+    if (motivo.trim().length === 0) {
+      window.alert('Informe o motivo do cancelamento.')
+      return
+    }
     startTransition(async () => {
-      const result = await cancelarRepasse(id)
+      const result = await cancelarRepasse(id, motivo)
       if (result.error) {
         window.alert(result.error)
       }

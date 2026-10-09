@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState } from 'react'
+import Link from 'next/link'
 import { signIn } from './actions'
 
 export function LoginForm({ lojaNome, lojaLogoUrl }: { lojaNome: string; lojaLogoUrl: string | null }) {
@@ -18,13 +19,14 @@ export function LoginForm({ lojaNome, lojaLogoUrl }: { lojaNome: string; lojaLog
         </div>
 
         <div className="space-y-1">
-          <label htmlFor="username" className="text-sm font-medium text-slate-700">
-            Usuário
+          <label htmlFor="login" className="text-sm font-medium text-slate-700">
+            E-mail
           </label>
           <input
-            id="username"
-            name="username"
+            id="login"
+            name="login"
             type="text"
+            inputMode="email"
             autoComplete="username"
             required
             className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
@@ -58,6 +60,12 @@ export function LoginForm({ lojaNome, lojaLogoUrl }: { lojaNome: string; lojaLog
         >
           {pending ? 'Entrando...' : 'Entrar'}
         </button>
+
+        <p className="text-center text-sm">
+          <Link href="/recuperar-senha" className="text-slate-600 underline">
+            Esqueci minha senha
+          </Link>
+        </p>
       </form>
     </div>
   )

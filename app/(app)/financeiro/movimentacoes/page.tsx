@@ -4,6 +4,7 @@ import { FinanceiroTabs } from '../FinanceiroTabs'
 import { MovimentacoesTable } from '../MovimentacoesTable'
 import { GerarReciboModal } from '../GerarReciboModal'
 import { formatarMoedaBR } from '@/lib/format'
+import { buscarTodos } from '@/lib/supabase/buscar-todos'
 
 type SearchParams = {
   dataInicio?: string
@@ -40,23 +41,27 @@ export default async function MovimentacoesPage({
     supabase.from('membros').select('id, nome').order('nome'),
   ])
 
-  let query = supabase
-    .from('movimentacoes')
-    .select(
-      'id, data, tipo, descricao, valor, origem, status, motivo_cancelamento, categorias_movimentacao(nome), contas(nome), formas_pagamento(nome), membros(nome)'
-    )
-    .order('data', { ascending: false })
-    .order('created_at', { ascending: false })
+  const { data: movimentacoes, error } = await buscarTodos((de, ate) => {
+    let query = supabase
+      .from('movimentacoes')
+      .select(
+        'id, data, tipo, descricao, valor, origem, status, motivo_cancelamento, categorias_movimentacao(nome), contas(nome), formas_pagamento(nome), membros(nome)'
+      )
 
-  if (params.dataInicio) query = query.gte('data', params.dataInicio)
-  if (params.dataFim) query = query.lte('data', params.dataFim)
-  if (params.tipo) query = query.eq('tipo', params.tipo)
-  if (params.categoriaId) query = query.eq('categoria_id', params.categoriaId)
-  if (params.contaId) query = query.eq('conta_id', params.contaId)
-  if (params.formaPagamentoId) query = query.eq('forma_pagamento_id', params.formaPagamentoId)
-  if (params.membroId) query = query.eq('membro_id', params.membroId)
+    if (params.dataInicio) query = query.gte('data', params.dataInicio)
+    if (params.dataFim) query = query.lte('data', params.dataFim)
+    if (params.tipo) query = query.eq('tipo', params.tipo)
+    if (params.categoriaId) query = query.eq('categoria_id', params.categoriaId)
+    if (params.contaId) query = query.eq('conta_id', params.contaId)
+    if (params.formaPagamentoId) query = query.eq('forma_pagamento_id', params.formaPagamentoId)
+    if (params.membroId) query = query.eq('membro_id', params.membroId)
 
-  const { data: movimentacoes, error } = await query
+    return query
+      .order('data', { ascending: false })
+      .order('created_at', { ascending: false })
+      .order('id')
+      .range(de, ate)
+  })
 
   if (error) {
     return (

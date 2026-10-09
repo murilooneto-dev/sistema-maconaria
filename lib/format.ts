@@ -12,6 +12,17 @@ export function abreviarMes(mes: number): string {
   return MESES_ABREVIADOS[mes - 1] ?? String(mes)
 }
 
+const ROTULOS_SITUACAO_MEMBRO: Record<string, string> = {
+  ATIVO: 'Ativo',
+  INATIVO: 'Inativo',
+  IRREGULAR: 'Irregular',
+}
+
+/** Rótulo de `membros.situacao` para telas e relatórios. */
+export function rotuloSituacaoMembro(situacao: string): string {
+  return ROTULOS_SITUACAO_MEMBRO[situacao] ?? situacao
+}
+
 /** Formata um valor numérico para moeda BR: `R$ 1.234,56`. */
 export function formatarMoedaBR(valor: number | null | undefined): string {
   const numero = valor ?? 0

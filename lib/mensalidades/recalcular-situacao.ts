@@ -1,9 +1,10 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { calcularSituacaoMembro, contarCompetenciasVencidasNaoPagas } from '@/lib/domain/inadimplencia'
+import { competenciaAtual } from '@/lib/datas'
 
 /**
- * Recalcula e persiste a situação (ATIVO/INATIVO) de um membro com base
+ * Recalcula e persiste a situação (ATIVO/INATIVO/IRREGULAR) de um membro com base
  * nas competências vencidas e não pagas. Membros fora do quadro
  * (do_quadro=false) são ignorados — decisão confirmada com o usuário em
  * 2026-08-11.
@@ -27,10 +28,7 @@ export async function recalcularSituacaoMembro(
     .select('ano, mes, status')
     .eq('membro_id', membroId)
 
-  const hoje = new Date()
-  const competenciaAtual = { ano: hoje.getUTCFullYear(), mes: hoje.getUTCMonth() + 1 }
-
-  const vencidasNaoPagas = contarCompetenciasVencidasNaoPagas(mensalidades ?? [], competenciaAtual)
+  const vencidasNaoPagas = contarCompetenciasVencidasNaoPagas(mensalidades ?? [], competenciaAtual())
   const novaSituacao = calcularSituacaoMembro(vencidasNaoPagas)
 
   if (novaSituacao !== membro.situacao) {

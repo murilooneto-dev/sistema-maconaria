@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { AcessoNegado } from '@/components/AcessoNegado'
 import { calcularTotal, MOTIVO_JA_REPASSADO } from '@/lib/domain/grande-loja'
 import { formatarMoedaBR } from '@/lib/format'
+import { buscarTodos } from '@/lib/supabase/buscar-todos'
 import { ItensPendentesForm } from './ItensPendentesForm'
 import { HistoricoRepasses } from './HistoricoRepasses'
 import { JaRepassadosList } from './JaRepassadosList'
@@ -24,12 +25,16 @@ export default async function GrandeLojaPage({
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   const podeEditar = profile?.role === 'ADMINISTRADOR' || profile?.role === 'TESOUREIRO'
 
-  const { data: itensPendentes, error } = await supabase
-    .from('repasses_grande_loja_itens')
-    .select('id, valor, mensalidades(ano, mes, membro_id, membros(nome))')
-    .eq('status', 'PENDENTE')
-    .is('repasse_id', null)
-    .order('created_at')
+  const { data: itensPendentes, error } = await buscarTodos((de, ate) =>
+    supabase
+      .from('repasses_grande_loja_itens')
+      .select('id, valor, mensalidades(ano, mes, membro_id, membros(nome))')
+      .eq('status', 'PENDENTE')
+      .is('repasse_id', null)
+      .order('created_at')
+      .order('id')
+      .range(de, ate)
+  )
 
   if (error) {
     return (

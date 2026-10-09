@@ -1,6 +1,6 @@
 # Sistema Maçonaria
 
-Sistema web profissional para gestão administrativa e financeira de uma Loja Maçônica: membros, mensalidades, inadimplência, remidos, Grande Loja, campanhas, doações, financeiro (entradas/saídas/contas/transferências), recibos, relatórios, fechamento mensal, usuários, permissões e auditoria (ver `SPEC_Loja_Maconica.md`).
+Sistema web profissional para gestão administrativa e financeira de uma Loja Maçônica: membros, mensalidades, inadimplência, remidos, Grande Loja, campanhas, doações, financeiro (entradas/saídas/contas/transferências), recibos, relatórios, fechamento mensal, usuários, permissões e auditoria (ver `SPEC.md`).
 
 O projeto está sendo construído por fases incrementais (ver `PROMPT_INICIAL.md`). A Fase 1 (Fundação) entrega o scaffold da aplicação, autenticação (username + senha via Supabase Auth), proteção de rotas e o layout autenticado (sidebar/header) com rotas placeholder para os módulos das fases seguintes.
 
@@ -66,7 +66,7 @@ O login usa **username + senha**. Internamente, o username é mapeado para um e-
 
 ## Documentação
 
-- **[SPEC_Loja_Maconica.md](./SPEC_Loja_Maconica.md)** - Especificação completa do sistema
+- **[SPEC.md](./SPEC.md)** - Especificação completa do sistema
 - **[CLAUDE.md](./CLAUDE.md)** - Instruções e regras de desenvolvimento
 - **[docs/arquitetura.md](./docs/arquitetura.md)** - Estrutura de pastas e fluxo de autenticação
 - **[docs/banco.md](./docs/banco.md)** - Schema do banco, RLS e decisões de design
@@ -91,7 +91,7 @@ Roadmap: [PROMPT_INICIAL.md](./PROMPT_INICIAL.md)
 ├── supabase/migrations/  # Migrations SQL versionadas
 ├── public/               # Assets estáticos
 ├── docs/                 # Documentação (arquitetura, banco, instalação)
-├── SPEC_Loja_Maconica.md # Especificação
+├── SPEC.md # Especificação
 ├── CLAUDE.md             # Regras de dev
 └── PROMPT_INICIAL.md     # Plano do projeto
 ```

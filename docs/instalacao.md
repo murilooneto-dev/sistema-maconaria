@@ -127,6 +127,21 @@ values (
 
 ---
 
+## 6.1. Recuperação de senha por e-mail
+
+O login é por e-mail + senha, e "Esqueci minha senha" envia um link para esse mesmo e-mail. Usuários antigos ainda sem e-mail entram com o username no mesmo campo, até um Administrador cadastrar o e-mail deles em Configurações → Usuários → Editar; enquanto isso, só recuperam a senha por redefinição feita por um Administrador.
+
+Configuração no painel do Supabase (uma vez por projeto):
+
+1. **Authentication → Emails → SMTP Settings:** ativar o SMTP próprio e preencher host, porta, usuário, senha e remetente do provedor.
+2. **Authentication → URL Configuration:** *Site URL* = endereço do sistema em produção; em *Redirect URLs*, adicionar `https://SEU-DOMINIO/auth/confirm` (e `http://localhost:3000/auth/confirm` para desenvolvimento).
+3. **Authentication → Emails → Templates → Reset Password:** trocar o link do modelo por
+   `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery`.
+   Sem esse passo o link ainda funciona, mas só se for aberto no mesmo navegador em que foi solicitado.
+   O Supabase só permite editar o modelo com SMTP próprio configurado (passo 1) ou em plano pago — no plano gratuito com o envio embutido, o modelo fica o padrão (em inglês) e o limite é de 2 e-mails por hora.
+
+Fluxo: `/recuperar-senha` → e-mail → `/auth/confirm` (troca o token por sessão) → `/nova-senha`.
+
 ## 7. Rodar o projeto localmente
 
 ```bash

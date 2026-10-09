@@ -1,8 +1,53 @@
 import { describe, expect, it } from 'vitest'
-import { validarEdicaoUsuario, validarNovoUsuario, validarSenha } from './usuarios'
+import { normalizarEmail, validarEdicaoUsuario, validarEmail, validarNovoUsuario, validarSenha } from './usuarios'
+
+describe('validarEmail', () => {
+  it('rejeita e-mail vazio (o e-mail é o login do sistema)', () => {
+    expect(validarEmail('').valido).toBe(false)
+    expect(validarEmail('   ').valido).toBe(false)
+  })
+
+  it('aceita um e-mail válido', () => {
+    expect(validarEmail('Joao.Silva@Exemplo.com.br')).toEqual({ valido: true })
+  })
+
+  it('rejeita e-mail malformado', () => {
+    expect(validarEmail('joao@exemplo').valido).toBe(false)
+    expect(validarEmail('joao exemplo.com').valido).toBe(false)
+  })
+
+  it('rejeita o domínio interno de autenticação', () => {
+    expect(validarEmail('admin@loja.internal').valido).toBe(false)
+  })
+
+  it('é aplicada na criação e na edição de usuário', () => {
+    const base = { username: 'joao', nome: 'João', role: 'CONSULTA', senha: 'senha1234' }
+    expect(validarNovoUsuario(base).valido).toBe(false)
+    expect(validarEdicaoUsuario({ nome: 'João', role: 'CONSULTA' }).valido).toBe(false)
+    expect(validarNovoUsuario({ ...base, email: 'invalido' }).valido).toBe(false)
+    expect(validarEdicaoUsuario({ nome: 'João', role: 'CONSULTA', email: 'invalido' }).valido).toBe(false)
+    expect(validarEdicaoUsuario({ nome: 'João', role: 'CONSULTA', email: 'joao@exemplo.com' })).toEqual({ valido: true })
+  })
+})
+
+describe('normalizarEmail', () => {
+  it('tira espaços e passa para minúsculas', () => {
+    expect(normalizarEmail('  Joao@Exemplo.COM ')).toBe('joao@exemplo.com')
+  })
+
+  it('devolve null para vazio', () => {
+    expect(normalizarEmail('  ')).toBeNull()
+  })
+})
 
 describe('validarNovoUsuario', () => {
-  const base = { username: 'joao.silva', nome: 'João Silva', role: 'CONSULTA', senha: 'senha1234' }
+  const base = {
+    username: 'joao.silva',
+    nome: 'João Silva',
+    role: 'CONSULTA',
+    senha: 'senha1234',
+    email: 'joao.silva@exemplo.com',
+  }
 
   it('aceita um input válido', () => {
     expect(validarNovoUsuario(base)).toEqual({ valido: true })
@@ -46,7 +91,9 @@ describe('validarNovoUsuario', () => {
 
 describe('validarEdicaoUsuario', () => {
   it('aceita um input válido', () => {
-    expect(validarEdicaoUsuario({ nome: 'João Silva', role: 'TESOUREIRO' })).toEqual({ valido: true })
+    expect(validarEdicaoUsuario({ nome: 'João Silva', role: 'TESOUREIRO', email: 'joao@exemplo.com' })).toEqual({
+      valido: true,
+    })
   })
 
   it('rejeita nome vazio', () => {

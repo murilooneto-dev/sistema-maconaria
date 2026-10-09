@@ -1,19 +1,26 @@
 export type Competencia = { ano: number; mes: number }
 
 /**
- * SPEC §10: o novo membro começa a gerar mensalidade no mês SEGUINTE ao
- * cadastro. Cadastro em 15/08/2026 → primeira competência 09/2026.
+ * SPEC §10 (revisado em 2026-10-09): o novo membro gera mensalidade a
+ * partir do PRÓPRIO mês do cadastro. Cadastro em 15/08/2026 → primeira
+ * competência 08/2026. `dataCadastro` é a coluna `date` do banco
+ * (YYYY-MM-DD), lida pelo texto pra não depender de fuso horário.
  */
-export function proximaCompetenciaAposCadastro(dataCadastro: string): Competencia {
-  const data = new Date(dataCadastro)
-  const mes = data.getUTCMonth() + 1
-  const ano = data.getUTCFullYear()
+export function competenciaDoCadastro(dataCadastro: string): Competencia {
+  const [ano, mes] = dataCadastro.split('-').map(Number)
+  return { ano, mes }
+}
 
-  if (mes === 12) {
-    return { ano: ano + 1, mes: 1 }
-  }
-
-  return { ano, mes: mes + 1 }
+/**
+ * Primeira competência que o membro deve ter em `ano`: janeiro, ou o mês
+ * do cadastro se ele entrou no meio desse ano. Se o cadastro for posterior
+ * a `ano`, devolve a própria competência do cadastro (fora do ano), o que
+ * faz `competenciasFaltantes` não gerar nada.
+ */
+export function primeiraCompetenciaDoAno(dataCadastro: string, ano: number): Competencia {
+  const cadastro = competenciaDoCadastro(dataCadastro)
+  const janeiro: Competencia = { ano, mes: 1 }
+  return competenciaMenorOuIgual(cadastro, janeiro) ? janeiro : cadastro
 }
 
 function paraIndice(c: Competencia): number {
@@ -39,8 +46,7 @@ function chave(c: Competencia): string {
 /**
  * Lista as competências entre `primeira` e `ate` (inclusive) que ainda não
  * existem em `existentes`. Não gera nada se `primeira` for posterior a
- * `ate` (membro cadastrado neste mês — SPEC §10: "Agosto não deve gerar
- * cobrança").
+ * `ate`.
  */
 export function competenciasFaltantes(
   primeira: Competencia,
