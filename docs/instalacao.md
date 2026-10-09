@@ -138,6 +138,7 @@ Configuração no painel do Supabase (uma vez por projeto):
 3. **Authentication → Emails → Templates → Reset Password:** trocar o link do modelo por
    `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery`.
    Sem esse passo o link ainda funciona, mas só se for aberto no mesmo navegador em que foi solicitado.
+   O Supabase só permite editar o modelo com SMTP próprio configurado (passo 1) ou em plano pago — no plano gratuito com o envio embutido, o modelo fica o padrão (em inglês) e o limite é de 2 e-mails por hora.
 
 Fluxo: `/recuperar-senha` → e-mail → `/auth/confirm` (troca o token por sessão) → `/nova-senha`.
 

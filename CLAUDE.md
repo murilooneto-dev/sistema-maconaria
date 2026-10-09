@@ -268,7 +268,7 @@ Obrigatório:
 
 Nunca armazenar senha da aplicação em tabela própria.
 
-O usuário utiliza username + senha na interface, mas a autenticação deve ser implementada de forma segura sobre o mecanismo de autenticação adotado.
+O usuário utiliza e-mail + senha na interface (SPEC §5; usuários antigos sem e-mail ainda entram com o username), mas a autenticação deve ser implementada de forma segura sobre o mecanismo de autenticação adotado.
 
 ---
 
