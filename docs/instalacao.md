@@ -142,6 +142,22 @@ Configuração no painel do Supabase (uma vez por projeto):
 
 Fluxo: `/recuperar-senha` → e-mail → `/auth/confirm` (troca o token por sessão) → `/nova-senha`.
 
+## 6.2. Lembrete por e-mail de contas a pagar e a receber
+
+O lembrete diário (SPEC §23.1) é enviado pelo [Resend](https://resend.com) e disparado pelo Vercel Cron (`vercel.json`, todo dia às 11:00 UTC = 08:00 de Brasília, rota `/api/cron/lembretes-contas`).
+
+1. Criar uma conta no Resend e **verificar o domínio** do sistema (registros DNS indicados por eles). Sem domínio verificado o Resend só entrega para o e-mail do dono da conta.
+2. Criar uma API key no Resend.
+3. Na Vercel, em Settings → Environment Variables (Production), definir:
+   - `RESEND_API_KEY` — a chave do passo 2;
+   - `EMAIL_REMETENTE` — ex.: `Tesouraria <avisos@SEU-DOMINIO>`;
+   - `CRON_SECRET` — um texto aleatório longo; a Vercel o envia ao chamar a rota, e a rota recusa qualquer chamada sem ele.
+4. Fazer um novo deploy para as variáveis valerem.
+
+Sem essas variáveis o resto do sistema funciona normalmente; só o lembrete não é enviado (a rota responde 401 ou 503).
+
+O mesmo Resend pode ser usado como SMTP próprio do Supabase (seção 6.1), o que libera o modelo do e-mail de recuperação de senha e tira o limite de 2 e-mails por hora.
+
 ## 7. Rodar o projeto localmente
 
 ```bash
