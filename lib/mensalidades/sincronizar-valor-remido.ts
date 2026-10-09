@@ -1,5 +1,6 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { competenciaAtual } from '@/lib/datas'
 
 /**
  * Quando um membro muda de remido/normal, as competências ainda PENDENTES
@@ -7,6 +8,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  * decisão do usuário (2026-08-13): "se um membro for marcado como REMIDO,
  * todas as mensalidades dele devem mudar automaticamente para o valor
  * configurado".
+ *
+ * Só competências do mês atual em diante (decisão do usuário, 2026-10-09):
+ * as vencidas mantêm o valor da época em que foram geradas.
  *
  * Escopo deliberadamente restrito a `status = 'PENDENTE'`: uma competência
  * PARCIAL ou QUITADA já tem `valor_pago` registrado, e a constraint
@@ -32,6 +36,8 @@ export async function sincronizarValorMensalidadesPendentes(
     return 0
   }
 
+  const atual = competenciaAtual()
+
   const { data: atualizadas, error } = await supabaseAdmin
     .from('mensalidades')
     .update({
@@ -41,6 +47,7 @@ export async function sincronizarValorMensalidadesPendentes(
     })
     .eq('membro_id', membroId)
     .eq('status', 'PENDENTE')
+    .or(`ano.gt.${atual.ano},and(ano.eq.${atual.ano},mes.gte.${atual.mes})`)
     .select('id')
 
   if (error) {
