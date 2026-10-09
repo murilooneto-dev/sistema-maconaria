@@ -21,6 +21,7 @@ Este documento descreve o schema do banco de dados, políticas de Row Level Secu
 | `nome` | `text` | Sim | — | Nome completo do usuário. |
 | `role` | `text` | Sim | — | Papel no sistema. CHECK constraint: `'ADMINISTRADOR'`, `'TESOUREIRO'`, ou `'CONSULTA'`. |
 | `ativo` | `boolean` | Sim | `true` | Status de atividade do perfil. |
+| `email` | `text` | Não | — | E-mail real: login do sistema e destino do link de recuperação de senha. Obrigatório pela aplicação para usuários novos; nulo só em usuários antigos ainda não atualizados — desde `00000000000032_profiles_email.sql`. Minúsculo, único, nunca `@loja.internal`. Quando preenchido, é também o `auth.users.email` do usuário (mantido em sincronia pela ação de edição de usuário); quando nulo, o usuário autentica pelo interno `<username>@loja.internal`. O login é sempre por username (`lib/auth/email-autenticacao.ts`). |
 | `created_at` | `timestamptz` | Sim | `now()` | Timestamp de criação. |
 | `updated_at` | `timestamptz` | Sim | `now()` | Timestamp de última atualização. Atualizado automaticamente por trigger. |
 
@@ -786,7 +787,12 @@ SPEC §22 pede para "bloquear alterações normais daquele período" quando um m
 | `observacao` | `text` | Não | — | — |
 | `status` | `text` | Sim | `'ENVIADO'` | `'ENVIADO'` ou `'CANCELADO'` (check). |
 | `conta_id` | `uuid` | Sim | — | FK → `contas(id)` — desde `00000000000022_grande_loja_fase9.sql`. Conta de onde o valor efetivamente sai (decisão do usuário, 2026-08-12: o repasse gera uma `movimentacoes` SAIDA real, debitando essa conta). |
+| `cancelado_por` | `uuid` | Não | — | FK → `profiles(id)` — desde `00000000000031_repasses_cancelamento.sql`. Nulo em repasses cancelados antes dessa migration. |
+| `cancelado_em` | `timestamptz` | Não | — | Obrigatório quando `status = 'CANCELADO'` (check `repasses_grande_loja_cancelamento_check`). |
+| `motivo_cancelamento` | `text` | Não | — | Obrigatório quando `status = 'CANCELADO'` (mesmo check). |
 | `created_at` / `updated_at` | `timestamptz` | Sim | `now()` | — |
+
+**Cancelamento:** exige motivo e é recusado se o mês de `data_envio` estiver fechado (verificado antes de mudar o status, para o repasse nunca ficar cancelado com a movimentação de saída ainda ativa).
 
 ### RLS
 

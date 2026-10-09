@@ -186,16 +186,24 @@ Tela `/login`.
 
 Campos:
 
-- usuário;
+- e-mail;
 - senha.
 
 Botão:
 
 - Entrar.
 
-O usuário utilizará username + senha na interface.
+Link:
 
-A autenticação deve ser implementada de forma segura utilizando Supabase Auth, criando uma camada de associação entre username e a identidade de autenticação do Supabase.
+- Esqueci minha senha.
+
+O usuário utilizará e-mail + senha na interface (regra revisada em 2026-10-09, a pedido do usuário; a redação original previa username + senha). O e-mail é obrigatório no cadastro de usuário e é o mesmo usado pelo Supabase Auth.
+
+Recuperação de senha: "Esqueci minha senha" envia para o e-mail do usuário um link para definir uma nova senha.
+
+Transição: usuários criados antes dessa mudança, ainda sem e-mail, continuam entrando com o username antigo no mesmo campo até um Administrador cadastrar o e-mail deles.
+
+A autenticação deve ser implementada de forma segura utilizando Supabase Auth.
 
 Não armazenar senha própria em tabela da aplicação.
 
@@ -344,7 +352,7 @@ Janeiro continua R$ 100.
 
 # 10. Novo membro
 
-O novo membro começa a gerar mensalidade no mês seguinte ao cadastro.
+O novo membro começa a gerar mensalidade no próprio mês do cadastro (regra revisada em 2026-10-09, a pedido do usuário; a redação original previa o mês seguinte).
 
 Exemplo:
 
@@ -352,9 +360,11 @@ Cadastro em 15/08/2026.
 
 Primeira competência:
 
-09/2026.
+08/2026.
 
-Agosto não deve gerar cobrança.
+Janeiro a julho de 2026 não geram cobrança. Nos anos seguintes o membro gera o ano inteiro.
+
+Exceção: membros importados via CSV são membros antigos da Loja sendo digitalizados e geram o ano corrente inteiro, de janeiro a dezembro (decisão de 2026-08-13).
 
 ---
 
