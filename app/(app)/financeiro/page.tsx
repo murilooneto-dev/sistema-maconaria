@@ -5,16 +5,9 @@ import { FinanceiroTabs } from './FinanceiroTabs'
 import { CentrosDeCustoGrid } from './CentrosDeCustoGrid'
 import { buscarDadosCentrosDeCusto } from '@/lib/relatorios/centros-de-custo'
 
+import { hojeISO, primeiroDiaMesAtual } from '@/lib/datas'
+
 type SearchParams = { dataInicio?: string; dataFim?: string }
-
-function primeiroDiaMesAtual(): string {
-  const hoje = new Date()
-  return `${hoje.getUTCFullYear()}-${String(hoje.getUTCMonth() + 1).padStart(2, '0')}-01`
-}
-
-function hojeISO(): string {
-  return new Date().toISOString().slice(0, 10)
-}
 
 export default async function FinanceiroVisaoGeralPage({
   searchParams,

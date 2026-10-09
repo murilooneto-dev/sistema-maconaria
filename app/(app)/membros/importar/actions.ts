@@ -5,6 +5,7 @@ import { requireAdmin, AuthorizationError } from '@/lib/auth/require-role'
 import { createSupabaseServiceRoleClient } from '@/lib/supabase/service'
 import { registrarAuditoria } from '@/lib/audit'
 import { parseCsvMembros } from '@/lib/domain/membros-import'
+import { hojeISO } from '@/lib/datas'
 import { gerarCompetenciasParaMembro } from '@/lib/mensalidades/gerar-competencias-membro'
 
 // Excel no Brasil costuma salvar CSV em Windows-1252 (ANSI), não UTF-8.
@@ -77,6 +78,7 @@ export async function importarMembros(
         remido: linha.remido,
         recolhe: linha.recolhe,
         em_iniciacao: linha.emIniciacao,
+        data_cadastro: hojeISO(),
       })
       .select('id, data_cadastro')
       .single()
@@ -94,11 +96,17 @@ export async function importarMembros(
 
     if (linha.doQuadro) {
       try {
-        await gerarCompetenciasParaMembro(supabaseAdmin, {
-          id: criado.id,
-          remido: linha.remido,
-          data_cadastro: criado.data_cadastro,
-        })
+        // Importação digitaliza membros antigos da Loja: devem o ano inteiro,
+        // não só a partir do mês em que foram lançados no sistema.
+        await gerarCompetenciasParaMembro(
+          supabaseAdmin,
+          {
+            id: criado.id,
+            remido: linha.remido,
+            data_cadastro: criado.data_cadastro,
+          },
+          'ANO_COMPLETO'
+        )
       } catch (geracaoError) {
         console.error(`Falha ao gerar competências para o membro importado ${criado.id}:`, geracaoError)
       }

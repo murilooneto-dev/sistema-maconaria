@@ -6,6 +6,7 @@ import { requireAdmin, AuthorizationError } from '@/lib/auth/require-role'
 import { createSupabaseServiceRoleClient } from '@/lib/supabase/service'
 import { registrarAuditoria } from '@/lib/audit'
 import { validarMembro } from '@/lib/domain/membros'
+import { hojeISO } from '@/lib/datas'
 import { gerarCompetenciasParaMembro } from '@/lib/mensalidades/gerar-competencias-membro'
 import { sincronizarValorMensalidadesPendentes } from '@/lib/mensalidades/sincronizar-valor-remido'
 
@@ -48,6 +49,10 @@ export async function criarMembro(
     remido,
     recolhe,
     em_iniciacao: emIniciacao,
+    // Gravada pela aplicação no horário de Brasília — o default do banco é
+    // UTC e jogaria um cadastro feito à noite, no último dia do mês, para o
+    // mês seguinte (e a primeira mensalidade junto).
+    data_cadastro: hojeISO(),
   }
 
   const { data: criado, error } = await supabaseAdmin
