@@ -129,6 +129,20 @@ const MENSAGENS_ORIGEM_NAO_EDITAVEL: Record<string, string> = {
     'Esta movimentação é gerada automaticamente por um repasse à Grande Loja — cancele o repasse na tela de Grande Loja.',
 }
 
+/**
+ * Movimentações geradas por pagamento, doação ou repasse só podem ser
+ * canceladas cancelando o registro de origem — cancelar só a movimentação
+ * deixaria a doação/repasse/pagamento ATIVO sem o dinheiro correspondente
+ * no caixa.
+ */
+export function podeCancelarMovimentacaoDiretamente(origem: string): ValidationResult {
+  const mensagemOrigem = MENSAGENS_ORIGEM_NAO_EDITAVEL[origem]
+  if (mensagemOrigem) {
+    return { valido: false, erro: mensagemOrigem }
+  }
+  return { valido: true }
+}
+
 /** Só movimentações ATIVAS de origem MANUAL podem ser editadas — as automáticas têm vínculo com outro registro (pagamento/doação/repasse) que a edição (cancelar+recriar) perderia. */
 export function podeEditarMovimentacao(mov: MovimentacaoEditavel): ValidationResult {
   if (mov.status !== 'ATIVO') {

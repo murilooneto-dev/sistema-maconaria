@@ -1,5 +1,5 @@
 import type { createSupabaseServerClient } from '@/lib/supabase/server'
-import { formatarDataBR } from '@/lib/format'
+import { formatarDataBR, rotuloSituacaoMembro } from '@/lib/format'
 import type { ResultadoRelatorio } from './tipos'
 
 export type FiltrosMembros = { situacao?: string; doQuadro?: string; remido?: string }
@@ -21,7 +21,8 @@ export async function buscarRelatorioMembros(
 
   const total = membros?.length ?? 0
   const ativos = (membros ?? []).filter((m) => m.situacao === 'ATIVO').length
-  const inativos = total - ativos
+  const inativos = (membros ?? []).filter((m) => m.situacao === 'INATIVO').length
+  const irregulares = (membros ?? []).filter((m) => m.situacao === 'IRREGULAR').length
 
   return {
     titulo: 'Resumo de membros',
@@ -29,12 +30,13 @@ export async function buscarRelatorioMembros(
       { label: 'Total', valor: String(total) },
       { label: 'Ativos', valor: String(ativos) },
       { label: 'Inativos', valor: String(inativos) },
+      { label: 'Irregulares', valor: String(irregulares) },
     ],
     colunas: ['Nome', 'Matrícula', 'Situação', 'Remido', 'Do quadro', 'Em iniciação', 'Data de cadastro'],
     linhas: (membros ?? []).map((m) => [
       m.nome,
       m.matricula ?? '-',
-      m.situacao === 'ATIVO' ? 'Ativo' : 'Inativo',
+      rotuloSituacaoMembro(m.situacao),
       m.remido ? 'Sim' : 'Não',
       m.do_quadro ? 'Sim' : 'Não',
       m.em_iniciacao ? 'Sim' : 'Não',

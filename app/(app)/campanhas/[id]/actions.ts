@@ -7,6 +7,7 @@ import { registrarAuditoria } from '@/lib/audit'
 import { validarDoacao } from '@/lib/domain/campanhas'
 import { criarMovimentacaoDoacao, cancelarMovimentacaoDoacao } from '@/lib/financeiro/movimentacao-doacao'
 import { recalcularStatusCampanha } from '@/lib/campanhas/recalcular-status'
+import { periodoEstaFechado } from '@/lib/financeiro/periodo'
 
 type ActionState = { error: string } | { success: string } | undefined
 
@@ -137,7 +138,7 @@ export async function cancelarDoacao(doacaoId: string, motivo: string): Promise<
 
   const { data: doacao, error: doacaoError } = await supabaseAdmin
     .from('doacoes')
-    .select('id, campanha_id, status')
+    .select('id, campanha_id, status, data')
     .eq('id', doacaoId)
     .single()
 
@@ -147,6 +148,13 @@ export async function cancelarDoacao(doacaoId: string, motivo: string): Promise<
 
   if (doacao.status === 'CANCELADO') {
     return { error: 'Esta doação já está cancelada.' }
+  }
+
+  // Precisa ser checado ANTES de cancelar a doação: o banco bloqueia o
+  // cancelamento da movimentação vinculada em período fechado, e a doação
+  // ficaria CANCELADA com a entrada ainda ATIVA no caixa.
+  if (await periodoEstaFechado(supabaseAdmin, doacao.data)) {
+    return { error: 'Não é possível cancelar: o período desta doação já está fechado.' }
   }
 
   const { data: reivindicada, error: reivindicarError } = await supabaseAdmin

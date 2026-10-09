@@ -1,4 +1,5 @@
 import type { createSupabaseServerClient } from '@/lib/supabase/server'
+import { buscarTodos } from '@/lib/supabase/buscar-todos'
 
 export type FiltrosCentrosDeCusto = {
   dataInicio?: string
@@ -156,15 +157,15 @@ export async function buscarDadosCentrosDeCusto(
   const [centrosRes, vinculosRes, movimentacoesRes] = await Promise.all([
     supabase.from('centros_de_custo').select('id, nome, cor').eq('ativo', true).order('nome'),
     supabase.from('centros_de_custo_categorias').select('centro_de_custo_id, categoria_id'),
-    (() => {
+    buscarTodos((de, ate) => {
       let query = supabase
         .from('movimentacoes')
         .select('id, data, descricao, valor, tipo, categorias_movimentacao(id, nome)')
         .eq('status', 'ATIVO')
       if (filtros.dataInicio) query = query.gte('data', filtros.dataInicio)
       if (filtros.dataFim) query = query.lte('data', filtros.dataFim)
-      return query
-    })(),
+      return query.order('id').range(de, ate)
+    }),
   ])
 
   if (centrosRes.error) throw centrosRes.error

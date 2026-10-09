@@ -1,5 +1,6 @@
 import 'server-only'
 import { createSupabaseServiceRoleClient } from '@/lib/supabase/service'
+import { buscarTodos } from '@/lib/supabase/buscar-todos'
 
 function pad(n: number): string {
   return String(n).padStart(2, '0')
@@ -64,11 +65,15 @@ export async function calcularSaldoInicialSemHistorico(
   const { data: contas } = await supabaseAdmin.from('contas').select('saldo_inicial')
   const somaSaldoInicial = (contas ?? []).reduce((s, c) => s + Number(c.saldo_inicial), 0)
 
-  const { data: movimentacoes } = await supabaseAdmin
-    .from('movimentacoes')
-    .select('tipo, valor')
-    .eq('status', 'ATIVO')
-    .lt('data', limite)
+  const { data: movimentacoes } = await buscarTodos((de, ate) =>
+    supabaseAdmin
+      .from('movimentacoes')
+      .select('tipo, valor')
+      .eq('status', 'ATIVO')
+      .lt('data', limite)
+      .order('id')
+      .range(de, ate)
+  )
 
   const somaMovimentacoes = (movimentacoes ?? []).reduce(
     (s, m) => s + (m.tipo === 'ENTRADA' ? Number(m.valor) : -Number(m.valor)),
@@ -86,12 +91,16 @@ export async function calcularTotaisPeriodo(
   const inicio = primeiroDia(ano, mes)
   const fim = primeiroDiaProximoMes(ano, mes)
 
-  const { data: movimentacoes } = await supabaseAdmin
-    .from('movimentacoes')
-    .select('tipo, valor')
-    .eq('status', 'ATIVO')
-    .gte('data', inicio)
-    .lt('data', fim)
+  const { data: movimentacoes } = await buscarTodos((de, ate) =>
+    supabaseAdmin
+      .from('movimentacoes')
+      .select('tipo, valor')
+      .eq('status', 'ATIVO')
+      .gte('data', inicio)
+      .lt('data', fim)
+      .order('id')
+      .range(de, ate)
+  )
 
   const totalEntradas = (movimentacoes ?? [])
     .filter((m) => m.tipo === 'ENTRADA')
@@ -100,12 +109,16 @@ export async function calcularTotaisPeriodo(
     .filter((m) => m.tipo === 'SAIDA')
     .reduce((s, m) => s + Number(m.valor), 0)
 
-  const { data: transferencias } = await supabaseAdmin
-    .from('transferencias')
-    .select('valor')
-    .eq('status', 'ATIVO')
-    .gte('data', inicio)
-    .lt('data', fim)
+  const { data: transferencias } = await buscarTodos((de, ate) =>
+    supabaseAdmin
+      .from('transferencias')
+      .select('valor')
+      .eq('status', 'ATIVO')
+      .gte('data', inicio)
+      .lt('data', fim)
+      .order('id')
+      .range(de, ate)
+  )
 
   const totalTransferencias = (transferencias ?? []).reduce((s, t) => s + Number(t.valor), 0)
 

@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { AcessoNegado } from '@/components/AcessoNegado'
 import { GerarMensalidadesButton } from './GerarMensalidadesButton'
+import { competenciaAtual } from '@/lib/datas'
+import { buscarTodos } from '@/lib/supabase/buscar-todos'
 
 const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
 
@@ -38,7 +40,7 @@ export default async function MensalidadesPage({
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   const podeGerenciar = profile?.role === 'ADMINISTRADOR' || profile?.role === 'TESOUREIRO'
 
-  const anoSelecionado = params.ano ? Number(params.ano) : new Date().getFullYear()
+  const anoSelecionado = params.ano ? Number(params.ano) : competenciaAtual().ano
 
   let queryMembros = supabase.from('membros').select('id, nome').eq('do_quadro', true).order('nome')
 
@@ -48,10 +50,14 @@ export default async function MensalidadesPage({
 
   const { data: membros } = await queryMembros
 
-  const { data: mensalidades, error } = await supabase
-    .from('mensalidades')
-    .select('membro_id, mes, status')
-    .eq('ano', anoSelecionado)
+  const { data: mensalidades, error } = await buscarTodos((de, ate) =>
+    supabase
+      .from('mensalidades')
+      .select('membro_id, mes, status')
+      .eq('ano', anoSelecionado)
+      .order('id')
+      .range(de, ate)
+  )
 
   if (error) {
     return (

@@ -5,7 +5,11 @@ import { redirect } from 'next/navigation'
 import { requireTesoureiro, AuthorizationError } from '@/lib/auth/require-role'
 import { createSupabaseServiceRoleClient } from '@/lib/supabase/service'
 import { registrarAuditoria } from '@/lib/audit'
-import { validarMovimentacao, podeEditarMovimentacao } from '@/lib/domain/financeiro'
+import {
+  validarMovimentacao,
+  podeEditarMovimentacao,
+  podeCancelarMovimentacaoDiretamente,
+} from '@/lib/domain/financeiro'
 import { periodoEstaFechado } from '@/lib/financeiro/periodo'
 import { uploadAnexosDoFormulario } from '@/lib/anexos/upload'
 
@@ -134,10 +138,9 @@ export async function cancelarMovimentacao(id: string, motivo: string): Promise<
     return { error: 'Esta movimentação já está cancelada.' }
   }
 
-  if (movimentacao.origem === 'MENSALIDADE') {
-    return {
-      error: 'Esta movimentação é gerada automaticamente por um pagamento de mensalidade — cancele o pagamento na tela de Mensalidades.',
-    }
+  const cancelavel = podeCancelarMovimentacaoDiretamente(movimentacao.origem)
+  if (!cancelavel.valido) {
+    return { error: cancelavel.erro }
   }
 
   if (await periodoEstaFechado(supabaseAdmin, movimentacao.data)) {

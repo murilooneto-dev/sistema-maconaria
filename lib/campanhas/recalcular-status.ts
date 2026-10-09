@@ -1,5 +1,6 @@
 import 'server-only'
 import { createSupabaseServiceRoleClient } from '@/lib/supabase/service'
+import { buscarTodos } from '@/lib/supabase/buscar-todos'
 import { calcularArrecadado, deveConcluirAutomaticamente } from '@/lib/domain/campanhas'
 
 /** SPEC §24: ao atingir a meta, EM_ANDAMENTO → CONCLUIDA automaticamente. Nunca reabre sozinho — reabertura é sempre manual. */
@@ -17,11 +18,15 @@ export async function recalcularStatusCampanha(
     return
   }
 
-  const { data: doacoes } = await supabaseAdmin
-    .from('doacoes')
-    .select('valor')
-    .eq('campanha_id', campanhaId)
-    .eq('status', 'ATIVO')
+  const { data: doacoes } = await buscarTodos((de, ate) =>
+    supabaseAdmin
+      .from('doacoes')
+      .select('valor')
+      .eq('campanha_id', campanhaId)
+      .eq('status', 'ATIVO')
+      .order('id')
+      .range(de, ate)
+  )
 
   const arrecadado = calcularArrecadado(doacoes ?? [])
 

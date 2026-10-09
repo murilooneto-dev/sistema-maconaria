@@ -1,5 +1,6 @@
 import type { createSupabaseServerClient } from '@/lib/supabase/server'
 import { formatarDataBR, formatarMoedaBR } from '@/lib/format'
+import { buscarTodos } from '@/lib/supabase/buscar-todos'
 import type { ResultadoRelatorio } from './tipos'
 
 export type FiltrosFinanceiro = {
@@ -17,24 +18,25 @@ export async function buscarRelatorioFinanceiro(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   filtros: FiltrosFinanceiro
 ): Promise<ResultadoRelatorio> {
-  let query = supabase
-    .from('movimentacoes')
-    .select(
-      'data, tipo, descricao, valor, status, categorias_movimentacao(nome), contas(nome), formas_pagamento(nome), membros(nome), campanhas(titulo)'
-    )
-    .eq('status', 'ATIVO')
-    .order('data', { ascending: false })
+  const { data: movimentacoes } = await buscarTodos((de, ate) => {
+    let query = supabase
+      .from('movimentacoes')
+      .select(
+        'data, tipo, descricao, valor, status, categorias_movimentacao(nome), contas(nome), formas_pagamento(nome), membros(nome), campanhas(titulo)'
+      )
+      .eq('status', 'ATIVO')
 
-  if (filtros.dataInicio) query = query.gte('data', filtros.dataInicio)
-  if (filtros.dataFim) query = query.lte('data', filtros.dataFim)
-  if (filtros.tipo) query = query.eq('tipo', filtros.tipo)
-  if (filtros.categoriaId) query = query.eq('categoria_id', filtros.categoriaId)
-  if (filtros.contaId) query = query.eq('conta_id', filtros.contaId)
-  if (filtros.formaPagamentoId) query = query.eq('forma_pagamento_id', filtros.formaPagamentoId)
-  if (filtros.membroId) query = query.eq('membro_id', filtros.membroId)
-  if (filtros.campanhaId) query = query.eq('campanha_id', filtros.campanhaId)
+    if (filtros.dataInicio) query = query.gte('data', filtros.dataInicio)
+    if (filtros.dataFim) query = query.lte('data', filtros.dataFim)
+    if (filtros.tipo) query = query.eq('tipo', filtros.tipo)
+    if (filtros.categoriaId) query = query.eq('categoria_id', filtros.categoriaId)
+    if (filtros.contaId) query = query.eq('conta_id', filtros.contaId)
+    if (filtros.formaPagamentoId) query = query.eq('forma_pagamento_id', filtros.formaPagamentoId)
+    if (filtros.membroId) query = query.eq('membro_id', filtros.membroId)
+    if (filtros.campanhaId) query = query.eq('campanha_id', filtros.campanhaId)
 
-  const { data: movimentacoes } = await query
+    return query.order('data', { ascending: false }).order('id').range(de, ate)
+  })
 
   const totalEntradas = (movimentacoes ?? [])
     .filter((m) => m.tipo === 'ENTRADA')

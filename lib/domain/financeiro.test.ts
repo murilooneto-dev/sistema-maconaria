@@ -1,6 +1,19 @@
 // lib/domain/financeiro.test.ts
 import { describe, expect, it } from 'vitest'
-import { podeEditarMovimentacao } from './financeiro'
+import { podeCancelarMovimentacaoDiretamente, podeEditarMovimentacao } from './financeiro'
+
+describe('podeCancelarMovimentacaoDiretamente', () => {
+  it('permite cancelar movimentação de origem MANUAL', () => {
+    expect(podeCancelarMovimentacaoDiretamente('MANUAL')).toEqual({ valido: true })
+  })
+
+  it.each(['MENSALIDADE', 'CAMPANHA', 'GRANDE_LOJA'])(
+    'rejeita movimentação de origem %s — precisa cancelar o registro de origem',
+    (origem) => {
+      expect(podeCancelarMovimentacaoDiretamente(origem).valido).toBe(false)
+    }
+  )
+})
 
 describe('podeEditarMovimentacao', () => {
   it('permite edição de movimentação ATIVA de origem MANUAL', () => {

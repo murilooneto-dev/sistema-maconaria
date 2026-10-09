@@ -1,6 +1,8 @@
 import type { createSupabaseServerClient } from '@/lib/supabase/server'
 import { contarCompetenciasVencidasNaoPagas, competenciaVencida } from '@/lib/domain/inadimplencia'
-import { formatarMoedaBR } from '@/lib/format'
+import { formatarMoedaBR, rotuloSituacaoMembro } from '@/lib/format'
+import { competenciaAtual } from '@/lib/datas'
+import { buscarTodos } from '@/lib/supabase/buscar-todos'
 import type { ResultadoRelatorio } from './tipos'
 
 export type FiltrosMensalidades = { situacao?: string }
@@ -17,14 +19,17 @@ export async function buscarRelatorioMensalidades(
 
   const { data: mensalidades } =
     membroIds.length > 0
-      ? await supabase
-          .from('mensalidades')
-          .select('membro_id, ano, mes, status, saldo')
-          .in('membro_id', membroIds)
+      ? await buscarTodos((de, ate) =>
+          supabase
+            .from('mensalidades')
+            .select('membro_id, ano, mes, status, saldo')
+            .in('membro_id', membroIds)
+            .order('id')
+            .range(de, ate)
+        )
       : { data: [] as { membro_id: string; ano: number; mes: number; status: string; saldo: number }[] }
 
-  const hoje = new Date()
-  const competenciaHoje = { ano: hoje.getUTCFullYear(), mes: hoje.getUTCMonth() + 1 }
+  const competenciaHoje = competenciaAtual()
 
   const linhas = (membros ?? []).map((membro) => {
     const doMembro = (mensalidades ?? []).filter((m) => m.membro_id === membro.id)
@@ -35,7 +40,7 @@ export async function buscarRelatorioMensalidades(
 
     return [
       membro.nome,
-      membro.situacao === 'ATIVO' ? 'Ativo' : 'Inativo',
+      rotuloSituacaoMembro(membro.situacao),
       String(vencidas),
       formatarMoedaBR(valorDevido),
     ]
