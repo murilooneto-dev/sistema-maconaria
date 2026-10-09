@@ -305,6 +305,10 @@ Não criar campos fixos `janeiro_pago`, `fevereiro_pago` etc. na tabela de membr
 - CANCELADA
 - NAO_APLICAVEL
 
+## Exclusão de mensalidade
+
+Uma competência gerada indevidamente pode ser excluída na página do membro (Administrador ou Tesoureiro), com motivo obrigatório (adicionado em 2026-10-09, a pedido do usuário). A exclusão marca a competência como `CANCELADA` — a linha nunca é apagada — e fica registrada na auditoria. Só é permitida para competência `PENDENTE` sem valor pago; havendo pagamento, é preciso cancelar o pagamento antes. Uma competência excluída não é recriada pela geração de mensalidades, não é cobrada e não conta como inadimplência; pode ser reativada (volta a `PENDENTE`).
+
 ## Cada competência deve preservar
 
 - membro;
