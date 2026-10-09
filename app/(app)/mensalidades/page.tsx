@@ -133,7 +133,11 @@ export default async function MensalidadesPage({
             <tbody>
               {membros.map((membro) => (
                 <tr key={membro.id} className="border-b border-slate-100 last:border-0">
-                  <td className="px-3 py-2 font-medium text-slate-900">{membro.nome}</td>
+                  <td className="px-3 py-2 font-medium text-slate-900">
+                    <Link href={`/membros/${membro.id}`} className="hover:underline">
+                      {membro.nome}
+                    </Link>
+                  </td>
                   {MESES.map((_, index) => {
                     const status = statusPorMembroMes.get(`${membro.id}-${index + 1}`)
                     return (

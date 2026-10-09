@@ -6,6 +6,7 @@ import { createSupabaseServiceRoleClient } from '@/lib/supabase/service'
 import { registrarAuditoria } from '@/lib/audit'
 import { gerarCompetenciasParaMembro } from '@/lib/mensalidades/gerar-competencias-membro'
 import { recalcularSituacaoMembro } from '@/lib/mensalidades/recalcular-situacao'
+import { podeExcluirMensalidade } from '@/lib/domain/mensalidades'
 
 type ActionState = { error: string } | { success: string } | undefined
 
@@ -112,4 +113,155 @@ export async function gerarMensalidades(
   }
 
   return { success: `${totalGeradas} competência(s) gerada(s) com sucesso.` }
+}
+
+function competenciaLabel(m: { ano: number; mes: number }): string {
+  return `${String(m.mes).padStart(2, '0')}/${m.ano}`
+}
+
+/**
+ * "Exclui" competências de um membro marcando-as como CANCELADA (nunca
+ * apaga a linha). Só aceita competência PENDENTE sem valor pago. A linha
+ * cancelada continua existindo, então a geração de mensalidades não a
+ * recria; `reativarMensalidade` desfaz.
+ */
+export async function excluirMensalidades(
+  membroId: string,
+  mensalidadeIds: string[],
+  motivo: string
+): Promise<{ error?: string; excluidas?: number }> {
+  let usuario
+  try {
+    usuario = await requireTesoureiro()
+  } catch (err) {
+    return { error: mensagemAutorizacao(err) }
+  }
+
+  if (mensalidadeIds.length === 0) {
+    return { error: 'Selecione ao menos uma mensalidade.' }
+  }
+  if (motivo.trim().length === 0) {
+    return { error: 'Informe o motivo da exclusão.' }
+  }
+
+  const supabaseAdmin = createSupabaseServiceRoleClient()
+
+  const { data: mensalidades, error: buscaError } = await supabaseAdmin
+    .from('mensalidades')
+    .select('id, ano, mes, status, valor_pago, valor_devido')
+    .eq('membro_id', membroId)
+    .in('id', mensalidadeIds)
+
+  if (buscaError || !mensalidades) {
+    return { error: `Falha ao carregar mensalidades: ${buscaError?.message ?? 'erro desconhecido'}` }
+  }
+  if (mensalidades.length !== new Set(mensalidadeIds).size) {
+    return { error: 'Uma ou mais mensalidades selecionadas não pertencem a este membro.' }
+  }
+
+  for (const mensalidade of mensalidades) {
+    const validacao = podeExcluirMensalidade(mensalidade)
+    if (!validacao.valido) {
+      return { error: `${competenciaLabel(mensalidade)}: ${validacao.erro}` }
+    }
+  }
+
+  // O filtro repete a regra no banco: se um pagamento entrar entre a
+  // leitura acima e este update, a competência paga não é cancelada.
+  const { data: canceladas, error } = await supabaseAdmin
+    .from('mensalidades')
+    .update({ status: 'CANCELADA' })
+    .eq('membro_id', membroId)
+    .in('id', mensalidadeIds)
+    .eq('status', 'PENDENTE')
+    .eq('valor_pago', 0)
+    .select('id, ano, mes')
+
+  if (error) {
+    return { error: `Falha ao excluir mensalidades: ${error.message}` }
+  }
+
+  const competencias = (canceladas ?? []).map(competenciaLabel)
+
+  if (competencias.length > 0) {
+    await recalcularSituacaoMembro(supabaseAdmin, membroId)
+
+    try {
+      await registrarAuditoria({
+        usuarioId: usuario.id,
+        modulo: 'mensalidades',
+        acao: 'EXCLUSAO_MENSALIDADE',
+        registroTabela: 'membros',
+        registroId: membroId,
+        dadosAnteriores: { mensalidades },
+        dadosNovos: { motivo: motivo.trim(), mensalidadeIds: (canceladas ?? []).map((m) => m.id) },
+        descricao: `Exclusão (cancelamento) de ${competencias.length} mensalidade(s): ${competencias.join(', ')}. Motivo: ${motivo.trim()}`,
+      })
+    } catch (auditError) {
+      console.error('Falha ao registrar auditoria (mensalidades excluídas com sucesso):', auditError)
+    }
+  }
+
+  revalidatePath('/mensalidades')
+  revalidatePath('/mensalidades/pagamento')
+  revalidatePath(`/membros/${membroId}`)
+
+  if (competencias.length !== mensalidades.length) {
+    return {
+      error: `${competencias.length} de ${mensalidades.length} mensalidade(s) excluída(s). As demais foram alteradas por outra operação — atualize a página e confira.`,
+    }
+  }
+  return { excluidas: competencias.length }
+}
+
+/** Desfaz uma exclusão: a competência CANCELADA volta a PENDENTE e a ser cobrada. */
+export async function reativarMensalidade(membroId: string, mensalidadeId: string): Promise<{ error?: string }> {
+  let usuario
+  try {
+    usuario = await requireTesoureiro()
+  } catch (err) {
+    return { error: mensagemAutorizacao(err) }
+  }
+
+  const supabaseAdmin = createSupabaseServiceRoleClient()
+
+  const { data: reativada, error } = await supabaseAdmin
+    .from('mensalidades')
+    .update({ status: 'PENDENTE' })
+    .eq('id', mensalidadeId)
+    .eq('membro_id', membroId)
+    .eq('status', 'CANCELADA')
+    .eq('valor_pago', 0)
+    .select('id, ano, mes')
+    .maybeSingle()
+
+  if (error) {
+    if (error.code === '23505') {
+      return { error: 'Já existe outra mensalidade ativa para esta competência.' }
+    }
+    return { error: `Falha ao reativar mensalidade: ${error.message}` }
+  }
+  if (!reativada) {
+    return { error: 'Mensalidade não encontrada ou não está excluída.' }
+  }
+
+  await recalcularSituacaoMembro(supabaseAdmin, membroId)
+
+  try {
+    await registrarAuditoria({
+      usuarioId: usuario.id,
+      modulo: 'mensalidades',
+      acao: 'REATIVACAO_MENSALIDADE',
+      registroTabela: 'mensalidades',
+      registroId: mensalidadeId,
+      descricao: `Reativação da mensalidade ${competenciaLabel(reativada)} (volta a PENDENTE)`,
+    })
+  } catch (auditError) {
+    console.error('Falha ao registrar auditoria (mensalidade reativada com sucesso):', auditError)
+  }
+
+  revalidatePath('/mensalidades')
+  revalidatePath('/mensalidades/pagamento')
+  revalidatePath(`/membros/${membroId}`)
+  return {}
 }

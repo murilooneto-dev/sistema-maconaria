@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { AcessoNegado } from '@/components/AcessoNegado'
 import { MembroDetalhe } from './MembroDetalhe'
+import { MensalidadesMembro } from './MensalidadesMembro'
 import { AnexosMembro } from '@/components/anexos/AnexosMembro'
 
 export default async function MembroDetalhePage({
@@ -43,10 +44,18 @@ export default async function MembroDetalhePage({
     .eq('status', 'ATIVO')
     .order('criado_em', { ascending: false })
 
+  const { data: mensalidades } = await supabase
+    .from('mensalidades')
+    .select('id, ano, mes, valor_devido, valor_pago, status')
+    .eq('membro_id', id)
+    .order('ano', { ascending: false })
+    .order('mes', { ascending: false })
+
   return (
     <div className="space-y-6">
       <h1 className="text-lg font-semibold text-slate-900">{membro.nome}</h1>
       <MembroDetalhe membro={membro} isAdmin={isAdmin} />
+      <MensalidadesMembro membroId={id} mensalidades={mensalidades ?? []} podeGerenciar={podeGerenciarAnexos} />
       <AnexosMembro membroId={id} anexos={anexos ?? []} podeGerenciar={podeGerenciarAnexos} />
     </div>
   )
