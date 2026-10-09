@@ -16,11 +16,40 @@ export function validarSenha(senha: string): ValidationResult {
   return { valido: true }
 }
 
+export function normalizarEmail(email: string): string | null {
+  const normalizado = email.trim().toLowerCase()
+  return normalizado.length === 0 ? null : normalizado
+}
+
+/**
+ * E-mail real do usuário — é o login do sistema e o destino do link de
+ * recuperação de senha, por isso obrigatório. O domínio interno
+ * `loja.internal` é recusado: é o endereço fictício de autenticação dos
+ * usuários antigos sem e-mail, e nunca receberia mensagem alguma.
+ */
+export function validarEmail(email: string): ValidationResult {
+  const normalizado = normalizarEmail(email)
+  if (normalizado === null) {
+    return { valido: false, erro: 'Informe o e-mail.' }
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizado)) {
+    return { valido: false, erro: 'Informe um e-mail válido.' }
+  }
+
+  if (normalizado.endsWith('@loja.internal')) {
+    return { valido: false, erro: 'Informe um e-mail real do usuário.' }
+  }
+
+  return { valido: true }
+}
+
 export function validarNovoUsuario(input: {
   username: string
   nome: string
   role: string
   senha: string
+  email?: string
 }): ValidationResult {
   const username = input.username.trim()
 
@@ -48,10 +77,10 @@ export function validarNovoUsuario(input: {
     return senhaValidacao
   }
 
-  return { valido: true }
+  return validarEmail(input.email ?? '')
 }
 
-export function validarEdicaoUsuario(input: { nome: string; role: string }): ValidationResult {
+export function validarEdicaoUsuario(input: { nome: string; role: string; email?: string }): ValidationResult {
   if (input.nome.trim().length === 0) {
     return { valido: false, erro: 'Informe o nome completo.' }
   }
@@ -60,5 +89,5 @@ export function validarEdicaoUsuario(input: { nome: string; role: string }): Val
     return { valido: false, erro: 'Perfil inválido.' }
   }
 
-  return { valido: true }
+  return validarEmail(input.email ?? '')
 }

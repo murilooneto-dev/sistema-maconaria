@@ -9,6 +9,7 @@ type Usuario = {
   nome: string
   role: 'ADMINISTRADOR' | 'TESOUREIRO' | 'CONSULTA'
   ativo: boolean
+  email: string | null
   created_at: string
 }
 
@@ -69,6 +70,7 @@ export function UsuariosTable({
           <tr>
             <th className="px-4 py-2 font-medium">Username</th>
             <th className="px-4 py-2 font-medium">Nome</th>
+            <th className="px-4 py-2 font-medium">E-mail</th>
             <th className="px-4 py-2 font-medium">Perfil</th>
             <th className="px-4 py-2 font-medium">Situação</th>
             <th className="px-4 py-2 font-medium">Ações</th>
@@ -85,9 +87,9 @@ export function UsuariosTable({
                     pending={isPending}
                     isSelf={usuario.id === currentUserId}
                     onCancel={() => setEditingId(null)}
-                    onSave={(nome, role) => {
+                    onSave={(nome, role, email) => {
                       startTransition(async () => {
-                        const result = await atualizarUsuario(usuario.id, nome, role)
+                        const result = await atualizarUsuario(usuario.id, nome, role, email)
                         setFeedback({
                           id: usuario.id,
                           message: result.error ?? 'Usuário atualizado.',
@@ -102,6 +104,9 @@ export function UsuariosTable({
                 ) : (
                   usuario.nome
                 )}
+              </td>
+              <td className="px-4 py-2 text-slate-500">
+                {editingId === usuario.id ? '—' : (usuario.email ?? <span className="text-slate-400">sem e-mail</span>)}
               </td>
               <td className="px-4 py-2">{editingId === usuario.id ? '—' : usuario.role}</td>
               <td className="px-4 py-2">
@@ -163,17 +168,27 @@ function EditForm({
   usuario: Usuario
   pending: boolean
   isSelf: boolean
-  onSave: (nome: string, role: Usuario['role']) => void
+  onSave: (nome: string, role: Usuario['role'], email: string) => void
   onCancel: () => void
 }) {
   const [nome, setNome] = useState(usuario.nome)
   const [role, setRole] = useState<Usuario['role']>(usuario.role)
+  const [email, setEmail] = useState(usuario.email ?? '')
 
   return (
     <div className="space-y-2">
       <input
         value={nome}
         onChange={(e) => setNome(e.target.value)}
+        aria-label="Nome completo"
+        className="w-full rounded border border-slate-300 px-2 py-1 text-sm"
+      />
+      <input
+        type="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="E-mail de acesso"
+        aria-label="E-mail"
         className="w-full rounded border border-slate-300 px-2 py-1 text-sm"
       />
       <select
@@ -195,7 +210,7 @@ function EditForm({
         <button
           type="button"
           disabled={pending}
-          onClick={() => onSave(nome, role)}
+          onClick={() => onSave(nome, role, email)}
           className="text-sm text-slate-900 underline disabled:opacity-50"
         >
           Salvar

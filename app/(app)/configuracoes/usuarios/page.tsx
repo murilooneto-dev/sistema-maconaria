@@ -21,7 +21,7 @@ export default async function UsuariosPage() {
 
   const { data: usuarios, error } = await supabase
     .from('profiles')
-    .select('id, username, nome, role, ativo, created_at')
+    .select('id, username, nome, role, ativo, email, created_at')
     .order('nome')
 
   if (error) {
