@@ -288,7 +288,10 @@ export async function registrarPagamento(
       .update({
         valor_pago: novoValorPago,
         status: novoStatus,
-        data_quitacao: novoStatus === 'QUITADA' ? new Date().toISOString() : null,
+        // Data em que o membro pagou (informada no formulário), não o momento
+        // do registro — decisão do usuário, 2026-10-09. Gravada como o início
+        // daquele dia em Brasília, porque a coluna é timestamptz.
+        data_quitacao: novoStatus === 'QUITADA' ? `${dataPagamento}T00:00:00-03:00` : null,
       })
       .eq('id', alocacao.mensalidadeId)
       .eq('valor_pago', mensalidade.valor_pago)

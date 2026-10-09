@@ -321,7 +321,7 @@ Uma competência gerada indevidamente pode ser excluída na página do membro (A
 - valor pago;
 - saldo;
 - status;
-- data de quitação.
+- data de quitação (a data em que o membro pagou, informada no registro do pagamento — não o momento em que o pagamento foi lançado no sistema).
 
 ---
 
@@ -351,6 +351,10 @@ Janeiro: R$ 100
 Abril: nova configuração R$ 120
 
 Janeiro continua R$ 100.
+
+## Mudança de normal para remido (ou o contrário)
+
+Ao alterar o campo Remido de um membro, as competências PENDENTES (sem nenhum valor pago) do mês atual em diante passam a usar o valor vigente do novo tipo. Competências vencidas, parciais ou quitadas mantêm o valor original (decisão do usuário, 2026-10-09).
 
 ---
 
@@ -657,6 +661,8 @@ Ao fechar:
 - bloquear alterações normais daquele período;
 - permitir reabertura somente pelo Administrador;
 - registrar reabertura na auditoria.
+
+"Bloquear alterações" vale para cancelar ou editar lançamentos do período fechado. Lançamento novo com data retroativa num mês fechado continua permitido (decisão do usuário, confirmada em 2026-10-09); por isso o saldo final gravado no fechamento pode ficar diferente do saldo recalculado depois.
 
 ---
 
