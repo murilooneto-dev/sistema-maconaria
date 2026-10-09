@@ -126,6 +126,34 @@ export function separarParaLembrete<T extends { status: string; data_vencimento:
   }
 }
 
+export const MAX_EMAILS_LEMBRETE = 10
+
+/**
+ * Lê a lista de e-mails do lembrete digitada em Configurações: um por
+ * linha ou separados por vírgula/ponto e vírgula. Normaliza para minúsculas
+ * e remove repetidos. Lista vazia é válida (volta ao padrão: Administradores
+ * e Tesoureiros).
+ */
+export function parseEmailsLembrete(texto: string): { valido: true; emails: string[] } | { valido: false; erro: string } {
+  const emails = [
+    ...new Set(
+      texto
+        .split(/[\n,;]+/)
+        .map((e) => e.trim().toLowerCase())
+        .filter((e) => e.length > 0)
+    ),
+  ]
+
+  const invalido = emails.find((e) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
+  if (invalido) {
+    return { valido: false, erro: `E-mail inválido: ${invalido}` }
+  }
+  if (emails.length > MAX_EMAILS_LEMBRETE) {
+    return { valido: false, erro: `Informe no máximo ${MAX_EMAILS_LEMBRETE} e-mails.` }
+  }
+  return { valido: true, emails }
+}
+
 /** O lembrete só é enviado quando há conta vencendo hoje ou em breve — conta vencida, sozinha, não gera e-mail todo dia. */
 export function deveEnviarLembrete(grupos: GruposLembrete<unknown>): boolean {
   return grupos.venceHoje.length > 0 || grupos.venceEmBreve.length > 0

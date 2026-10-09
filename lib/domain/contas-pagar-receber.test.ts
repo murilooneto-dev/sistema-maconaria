@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  parseEmailsLembrete,
   contaVencida,
   deveEnviarLembrete,
   gerarVencimentosRecorrentes,
@@ -130,5 +131,27 @@ describe('lembrete de vencimento', () => {
     expect(deveEnviarLembrete({ venceHoje: [1], venceEmBreve: [], vencidas: [] })).toBe(true)
     expect(deveEnviarLembrete({ venceHoje: [], venceEmBreve: [1], vencidas: [] })).toBe(true)
     expect(deveEnviarLembrete({ venceHoje: [], venceEmBreve: [], vencidas: [1, 2] })).toBe(false)
+  })
+})
+
+describe('parseEmailsLembrete', () => {
+  it('aceita e-mails por linha, vírgula ou ponto e vírgula, normaliza e remove repetidos', () => {
+    expect(parseEmailsLembrete('Tesouraria@Loja.com.br\nfulano@gmail.com; tesouraria@loja.com.br, ')).toEqual({
+      valido: true,
+      emails: ['tesouraria@loja.com.br', 'fulano@gmail.com'],
+    })
+  })
+
+  it('aceita lista vazia (volta ao padrão)', () => {
+    expect(parseEmailsLembrete('  \n ')).toEqual({ valido: true, emails: [] })
+  })
+
+  it('rejeita e-mail malformado indicando qual', () => {
+    expect(parseEmailsLembrete('ok@x.com, ruim@x')).toEqual({ valido: false, erro: 'E-mail inválido: ruim@x' })
+  })
+
+  it('rejeita mais de 10 e-mails', () => {
+    const muitos = Array.from({ length: 11 }, (_, i) => `p${i}@x.com`).join(',')
+    expect(parseEmailsLembrete(muitos).valido).toBe(false)
   })
 })

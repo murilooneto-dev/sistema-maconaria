@@ -55,16 +55,30 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ enviado: false, motivo: 'Nenhuma conta vencendo hoje ou em breve.' })
   }
 
-  const { data: destinatarios } = await supabaseAdmin
-    .from('profiles')
-    .select('email')
-    .in('role', ['ADMINISTRADOR', 'TESOUREIRO'])
-    .eq('ativo', true)
-    .not('email', 'is', null)
+  const { data: loja } = await supabaseAdmin
+    .from('loja_config')
+    .select('nome, emails_lembrete_contas')
+    .eq('id', 1)
+    .maybeSingle()
 
-  const emails = (destinatarios ?? []).map((d) => d.email as string)
+  // Destinatários definidos em Configurações → Lembretes; sem nenhum, vai
+  // para os Administradores e Tesoureiros ativos com e-mail cadastrado.
+  let emails: string[] = loja?.emails_lembrete_contas ?? []
   if (emails.length === 0) {
-    return NextResponse.json({ enviado: false, motivo: 'Nenhum Administrador ou Tesoureiro com e-mail cadastrado.' })
+    const { data: destinatarios } = await supabaseAdmin
+      .from('profiles')
+      .select('email')
+      .in('role', ['ADMINISTRADOR', 'TESOUREIRO'])
+      .eq('ativo', true)
+      .not('email', 'is', null)
+    emails = (destinatarios ?? []).map((d) => d.email as string)
+  }
+
+  if (emails.length === 0) {
+    return NextResponse.json({
+      enviado: false,
+      motivo: 'Nenhum destinatário: defina os e-mails em Configurações → Lembretes ou cadastre o e-mail dos usuários.',
+    })
   }
 
   const totalContas = grupos.venceHoje.length + grupos.venceEmBreve.length + grupos.vencidas.length
@@ -82,7 +96,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ erro: `Falha ao registrar envio: ${registroError.message}` }, { status: 500 })
   }
 
-  const { data: loja } = await supabaseAdmin.from('loja_config').select('nome').eq('id', 1).maybeSingle()
   // A Vercel chama a rotina pelo endereço interno do deploy; o link do
   // e-mail precisa do domínio de produção, que ela expõe nesta variável.
   const dominioProducao = process.env.VERCEL_PROJECT_PRODUCTION_URL

@@ -712,7 +712,7 @@ Só conta ABERTA, com motivo. Em conta recorrente, é possível cancelar a parce
 
 ## Lembrete por e-mail
 
-Uma vez por dia, de manhã, o sistema envia um e-mail aos Administradores e Tesoureiros ativos com e-mail cadastrado, listando as contas que vencem hoje e as que vencem em 3 dias; as vencidas e ainda em aberto aparecem junto. Não há envio em dias sem conta vencendo hoje ou em 3 dias.
+Uma vez por dia, de manhã, o sistema envia um e-mail para os endereços definidos em Configurações → Lembretes (até 10; sem nenhum definido, vai aos Administradores e Tesoureiros ativos com e-mail cadastrado), listando as contas que vencem hoje e as que vencem em 3 dias; as vencidas e ainda em aberto aparecem junto. Não há envio em dias sem conta vencendo hoje ou em 3 dias.
 
 ## Permissões
 

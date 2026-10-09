@@ -10,6 +10,7 @@ const SECOES = [
   { titulo: 'Categorias de movimentação', href: '/configuracoes/categorias', apenasAdmin: true },
   { titulo: 'Centros de custo', href: '/configuracoes/centros-de-custo', apenasAdmin: true },
   { titulo: 'Recibo', href: '/configuracoes/recibo', apenasAdmin: true },
+  { titulo: 'Lembretes por e-mail', href: '/configuracoes/lembretes', apenasAdmin: true },
 ] as const
 
 export default async function ConfiguracoesPage() {
