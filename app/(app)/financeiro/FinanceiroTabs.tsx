@@ -7,6 +7,7 @@ const TABS = [
   { href: '/financeiro', label: 'Visão geral' },
   { href: '/financeiro/movimentacoes', label: 'Movimentações' },
   { href: '/financeiro/nova', label: 'Nova movimentação' },
+  { href: '/financeiro/contas-a-pagar', label: 'Contas a pagar e receber' },
   { href: '/financeiro/transferencias', label: 'Transferências' },
   { href: '/financeiro/fechamento', label: 'Fechamento mensal' },
 ] as const

@@ -127,6 +127,8 @@ const MENSAGENS_ORIGEM_NAO_EDITAVEL: Record<string, string> = {
     'Esta movimentação é gerada automaticamente por uma doação de campanha — cancele a doação na tela de Campanhas.',
   GRANDE_LOJA:
     'Esta movimentação é gerada automaticamente por um repasse à Grande Loja — cancele o repasse na tela de Grande Loja.',
+  CONTA_PAGAR_RECEBER:
+    'Esta movimentação é gerada automaticamente pela baixa de uma conta a pagar/receber — estorne a baixa na tela de Contas a pagar e receber.',
 }
 
 /**

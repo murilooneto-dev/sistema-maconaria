@@ -142,6 +142,24 @@ Configuração no painel do Supabase (uma vez por projeto):
 
 Fluxo: `/recuperar-senha` → e-mail → `/auth/confirm` (troca o token por sessão) → `/nova-senha`.
 
+## 6.2. Lembrete por e-mail de contas a pagar e a receber
+
+O lembrete diário (SPEC §23.1) é enviado por SMTP (ex.: uma conta Gmail) e disparado pelo Vercel Cron (`vercel.json`, todo dia às 11:00 UTC = 08:00 de Brasília, rota `/api/cron/lembretes-contas`).
+
+1. Na conta Google que vai enviar: ativar a **verificação em duas etapas** e criar uma **senha de app** (myaccount.google.com → Segurança → Senhas de app). A senha normal da conta não funciona.
+2. Na Vercel, em Settings → Environment Variables (Production), definir:
+   - `SMTP_HOST` = `smtp.gmail.com`
+   - `SMTP_PORT` = `465`
+   - `SMTP_USER` = o endereço Gmail
+   - `SMTP_PASS` = a senha de app do passo 1 (16 letras, sem espaços)
+   - `EMAIL_REMETENTE` = ex.: `Tesouraria <o-mesmo-endereco@gmail.com>` (no Gmail tem que ser o mesmo endereço do `SMTP_USER`)
+   - `CRON_SECRET` = um texto aleatório longo; a Vercel o envia ao chamar a rota, e a rota recusa qualquer chamada sem ele.
+3. Fazer um novo deploy para as variáveis valerem.
+
+Sem essas variáveis o resto do sistema funciona normalmente; só o lembrete não é enviado (a rota responde 401 ou 503). O Gmail permite cerca de 500 envios por dia — de sobra para o lembrete.
+
+Os mesmos dados de SMTP podem ser configurados no Supabase (Authentication → Emails → SMTP Settings, seção 6.1), o que libera o modelo do e-mail de recuperação de senha e tira o limite de 2 e-mails por hora.
+
 ## 7. Rodar o projeto localmente
 
 ```bash

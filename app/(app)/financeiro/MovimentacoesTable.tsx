@@ -12,6 +12,7 @@ const ROTULO_CANCELAR_NA_ORIGEM: Record<string, string> = {
   MENSALIDADE: 'via Mensalidades',
   CAMPANHA: 'via Campanhas',
   GRANDE_LOJA: 'via Grande Loja',
+  CONTA_PAGAR_RECEBER: 'via Contas a pagar',
 }
 
 type Movimentacao = {

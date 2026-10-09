@@ -679,6 +679,51 @@ Canceladas não entram em saldos ou relatórios ativos.
 
 ---
 
+# 23.1. Contas a pagar e a receber
+
+Adicionado em 2026-10-09, a pedido do usuário.
+
+Tela `/financeiro/contas-a-pagar`.
+
+Cadastro de compromissos futuros:
+
+- tipo: a pagar ou a receber;
+- conta: o que está sendo pago ou recebido (ex.: Energia, Aluguel) — sugere os nomes já usados e aceita um novo;
+- valor;
+- data de vencimento;
+- recorrente: sim/não, e por quantos meses;
+- observação.
+
+Conta recorrente: o sistema cria de uma vez uma conta por mês, com o mesmo valor e o mesmo dia de vencimento (ou o último dia do mês, quando o mês não tem aquele dia).
+
+Status:
+
+- ABERTA;
+- BAIXADA (paga ou recebida);
+- CANCELADA.
+
+"Vencida" não é um status: é toda conta ABERTA com vencimento anterior a hoje.
+
+## Baixa
+
+Dar baixa informa data, valor pago/recebido, conta bancária, forma de pagamento e categoria, e cria automaticamente a movimentação no Financeiro (saída para conta a pagar, entrada para conta a receber). Só a movimentação entra em saldos e relatórios — a conta em si, não.
+
+A movimentação gerada pela baixa não pode ser editada nem cancelada diretamente no Financeiro: é preciso estornar a baixa, o que cancela a movimentação e devolve a conta para ABERTA. O estorno é recusado se o mês da baixa estiver fechado.
+
+## Cancelamento
+
+Só conta ABERTA, com motivo. Em conta recorrente, é possível cancelar a parcela atual e todas as seguintes em aberto.
+
+## Lembrete por e-mail
+
+Uma vez por dia, de manhã, o sistema envia um e-mail para os endereços definidos em Configurações → Lembretes (até 10; sem nenhum definido, vai aos Administradores e Tesoureiros ativos com e-mail cadastrado), listando as contas que vencem hoje e as que vencem em 3 dias; as vencidas e ainda em aberto aparecem junto. Não há envio em dias sem conta vencendo hoje ou em 3 dias.
+
+## Permissões
+
+Administrador e Tesoureiro criam, dão baixa, estornam e cancelam. Consulta apenas visualiza.
+
+---
+
 # 24. Campanhas
 
 Tela `/campanhas`.

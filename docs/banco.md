@@ -580,6 +580,37 @@ A soma de `pagamento_mensalidades.valor_aplicado` para uma dada `mensalidade_id`
 
 ---
 
+## Tabela: `contas_pagar_receber`
+
+**Namespace:** `public.contas_pagar_receber` · **Migration:** `00000000000033_contas_pagar_receber.sql`
+
+**Responsabilidade:** Compromissos futuros a pagar ou a receber (SPEC §23.1). Não entra em saldo: só a `movimentacoes` criada na baixa entra.
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `tipo` | `text` | `'PAGAR'` ou `'RECEBER'`. |
+| `nome` | `text` | O que é pago/recebido ("Energia"). Texto livre; não é FK para `contas` (contas bancárias). |
+| `valor` | `numeric(12,2)` | `> 0`. Valor previsto. |
+| `data_vencimento` | `date` | — |
+| `recorrencia_id` / `parcela` / `total_parcelas` | `uuid` / `integer` / `integer` | Preenchidos juntos nas contas recorrentes (uma linha por mês, criadas de uma vez); `(recorrencia_id, parcela)` é único. |
+| `status` | `text` | `'ABERTA'`, `'BAIXADA'` ou `'CANCELADA'`. "Vencida" é derivado (ABERTA com vencimento passado). |
+| `data_baixa` / `valor_baixa` / `baixado_por` / `baixado_em` | — | Obrigatórios quando `BAIXADA`, nulos nos demais status (check). |
+| `movimentacao_id` | `uuid` | FK → `movimentacoes(id)`, a movimentação criada pela baixa (`origem = 'CONTA_PAGAR_RECEBER'`). Único. |
+| `motivo_cancelamento` / `cancelado_por` / `cancelado_em` | — | Obrigatórios quando `CANCELADA`, nulos nos demais (check). |
+| `usuario_id` | `uuid` | Quem cadastrou. |
+
+**RLS:** SELECT para `authenticated`; INSERT/UPDATE para `is_tesoureiro()`; sem DELETE.
+
+**Estorno de baixa:** cancela a movimentação vinculada e devolve a linha para `ABERTA` com os campos de baixa nulos; o histórico fica na auditoria e na movimentação cancelada.
+
+## Tabela: `lembretes_contas_envios`
+
+**Migration:** `00000000000033_contas_pagar_receber.sql`
+
+Uma linha por dia em que o lembrete de vencimentos foi enviado (`data` é a PK). Impede envio duplicado se a rotina agendada rodar mais de uma vez no dia. RLS ligado sem policies: só a aplicação (service role) acessa.
+
+---
+
 ## Tabela: `categorias_movimentacao`
 
 **Namespace:** `public.categorias_movimentacao` · **Migration:** `00000000000020_financeiro_fase7.sql`

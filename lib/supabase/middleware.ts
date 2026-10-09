@@ -37,7 +37,11 @@ export async function updateSession(request: NextRequest) {
   const isRecuperacaoRoute =
     request.nextUrl.pathname.startsWith('/recuperar-senha') || request.nextUrl.pathname.startsWith('/auth/confirm')
 
-  if (!user && !isLoginRoute && !isRecuperacaoRoute) {
+  // Rotinas agendadas não têm sessão: cada rota em /api/cron valida o
+  // próprio segredo (CRON_SECRET) e recusa quem não o apresenta.
+  const isCronRoute = request.nextUrl.pathname.startsWith('/api/cron/')
+
+  if (!user && !isLoginRoute && !isRecuperacaoRoute && !isCronRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     const redirectResponse = NextResponse.redirect(url)
